@@ -1,19 +1,16 @@
---[[ Show or hide indicators based on talent option
-
-"talentID" The ID of the talent that controls the indicator
-"spec" The spec to run the check on - can use both name and ID
-"indicator" The name of the indicator you want to control
-    If the indicator doesn't exist in the layout, it will be ignored
-"enabled" The state of the indicator you want when the talent is active
-    The inverse state will be used when the talent is not active
-"layout" Name of the layout you want this to apply to
-    If no layout is provided, it will apply to all layouts
-
-]]
-
--------------------------
+--  Show or hide indicators based on talent option
+---------------------------------------------------------------------------
 -- SET YOUR OPTIONS HERE
--------------------------
+--
+-- "talentID" The ID of the talent that controls the indicator
+-- "spec" The spec to run the check on - can use both name and ID
+-- "indicator" The name of the indicator you want to control
+--     If the indicator doesn't exist in the layout, it will be ignored
+-- "enabled" The state of the indicator you want when the talent is active
+--     The inverse state will be used when the talent is not active
+-- "layout" Name of the layout you want this to apply to
+--     If no layout is provided, it will apply to all layouts
+---------------------------------------------------------------------------
 ---@type table<number, IndicatorTalentOption>
 local IndicatorTalentOptions = {
     -- Example, Only show Prescience indicator when: 
@@ -22,6 +19,9 @@ local IndicatorTalentOptions = {
     -- 3. Using the the default layout 
     { talentID = 409311, spec = "Augmentation", indicator = "Prescience", enabled = true, layout = "default" },
 }
+---------------------------------------------------------------------------
+-- END OF OPTIONS
+---------------------------------------------------------------------------
 
 -- functions
 local F = Cell.funcs
