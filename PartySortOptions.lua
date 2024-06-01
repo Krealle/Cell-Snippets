@@ -194,12 +194,19 @@ updateAttributes = function(nameList)
         end
 
         CellPartyFrameHeader:SetAttribute("nameList", F:TableToString(nameList, ","))
+
+        -- update OmniCD namespace
+        for i = 1, 5 do
+            CellPartyFrameHeader:UpdateButtonUnit(CellPartyFrameHeader[i]:GetName(), CellPartyFrameHeader[i]:GetAttribute("unit"))
+        end
         return
     end
 
     for i = 1, 5 do
         local unit = nameList[i] or "party"..i
         CellPartyFrameHeader[i]:SetAttribute("unit", unit)
+        -- update OmniCD namespace
+        CellPartyFrameHeader:UpdateButtonUnit(CellPartyFrameHeader[i]:GetName(), unit)
     end
 end
 
