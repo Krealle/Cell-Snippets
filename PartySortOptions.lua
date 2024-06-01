@@ -10,6 +10,12 @@
 ---------------------------------------------------------------------------
 -- SET YOUR OPTIONS HERE
 
+-- This will maintain strict group order on roster changes in combat 
+-- but will not show new group members until combat ends.
+-- Recommend to keep it off unless you expect a lot of changes in combat
+-- without the players in the group changing
+local useNameFilter = false
+
 -- Used for index sorting
 -- Valid range: 1-5
 local fixedPlayerIndex = 1 
@@ -84,7 +90,6 @@ sortPartyFrames = function(layout, which)
         nameList = indexSort()
     end
 
-    DevAdd(nameList, "nameList")
     if not nameList then
         Print("Found no players in party.", true)
         return
@@ -93,31 +98,33 @@ sortPartyFrames = function(layout, which)
     updateAttributes(nameList)
 end
 
----@return string|false
+---@return table<string>|false
 indexSort = function()
-    local names = {}
+    local units = {}
     for unit in F:IterateGroupMembers() do
         local name = GetUnitName(unit, true)
 
-        if name and name ~= playerName then
-            tinsert(names, name)
+        if unit ~= "player" and name ~= playerName then
+            local unitToUse = useNameFilter and name or unit
+            tinsert(units, unitToUse)
         end
     end
 
     -- Prevent nil entries
-    local index = math.min(fixedPlayerIndex, #names + 1)
-    tinsert(names, index, playerName)
+    local index = math.min(fixedPlayerIndex, #units + 1)
+    local player = useNameFilter and playerName or "player"
+    tinsert(units, index, player)
 
-    DevAdd(names, "indexSort names")
-    if #names == 0 then return false end
+    DevAdd(units, "indexSort units")
+    if #units == 0 then return false end
 
-    return F:TableToString(names, ",") 
+    return units
 end
 
----@param string
----@return string|false
+---@param layout string
+---@return table<string>|false
 roleSort = function(layout)
-    local roleNames = {
+    local roleUnits = {
         ["TANK"] = {},
         ["HEALER"] = {},
         ["DAMAGER"] = {},
@@ -126,38 +133,39 @@ roleSort = function(layout)
 
     for unit in F:IterateGroupMembers() do
         local name = GetUnitName(unit, true)
-
-        if name and name ~= playerName then
-            tinsert(roleNames[UnitGroupRolesAssigned(unit)], name)
+        if unit ~= "player" and name ~= playerName then
+            local unitToUse = useNameFilter and name or unit
+            tinsert(roleUnits[UnitGroupRolesAssigned(unit)], unitToUse)
         end
     end
 
     -- Prevent nil entries
-    local index = math.min(fixedPlayerDamagerIndex, #roleNames["DAMAGER"] + 1)
-    tinsert(roleNames["DAMAGER"], index, playerName)
+    local index = math.min(fixedPlayerDamagerIndex, #roleUnits["DAMAGER"] + 1)
+    local player = useNameFilter and playerName or "player"
+    tinsert(roleUnits["DAMAGER"], index, player)
 
-    DevAdd(roleNames, "roleSort roleNames")
-    local names = {}
-    for _, role in pairs(layout["main"]["roleOrder"]) do
-        if roleNames[role] then
-            for _, name in pairs(roleNames[role]) do
-                tinsert(names, name)
+    DevAdd(roleUnits, "roleSort")
+    local units = {}
+    for _, role in pairs(Cell.vars.currentLayoutTable["main"]["roleOrder"]) do
+        if roleUnits[role] then
+            for _, unit in pairs(roleUnits[role]) do
+                tinsert(units, unit)
             end
         end
     end
 
-    if #roleNames["NONE"] > 0 then
+    if #roleUnits["NONE"] > 0 then
         -- Again this shouldn't happen but just in case
         -- We don't want to hide any potential players
-        for _, name in pairs(roleNames["NONE"]) do
-            tinsert(names, name)
+        for _, unit in pairs(roleUnits["NONE"]) do
+            tinsert(units, unit)
         end
     end
 
-    DevAdd(names, "roleSort names")
-    if #names == 0 then return false end
+    DevAdd(units, "roleSort units")
+    if #units == 0 then return false end
 
-    return F:TableToString(names, ",")
+    return units
 end
 
 -- MARK: Helper functions
@@ -171,20 +179,28 @@ shouldSort = function(layout)
             or playerRole ~= "NONE"
 end
 
----@param nameList string
+---@param nameList table<string>
 updateAttributes = function(nameList)
     if InCombatLockdown() then 
         queuedUpdate = true
         return 
     end
     
-    if CellPartyFrameHeader:GetAttribute("sortMethod") ~= "NAMELIST" then
-        CellPartyFrameHeader:SetAttribute("groupingOrder", "")
-        CellPartyFrameHeader:SetAttribute("groupBy", nil)
-        CellPartyFrameHeader:SetAttribute("sortMethod", "NAMELIST")
+    if useNameFilter then
+        if CellPartyFrameHeader:GetAttribute("sortMethod") ~= "NAMELIST" then
+            CellPartyFrameHeader:SetAttribute("groupingOrder", "")
+            CellPartyFrameHeader:SetAttribute("groupBy", nil)
+            CellPartyFrameHeader:SetAttribute("sortMethod", "NAMELIST")
+        end
+
+        CellPartyFrameHeader:SetAttribute("nameList", F:TableToString(nameList, ","))
+        return
     end
 
-    CellPartyFrameHeader:SetAttribute("nameList", nameList)
+    for i = 1, 5 do
+        local unit = nameList[i] or "party"..i
+        CellPartyFrameHeader[i]:SetAttribute("unit", unit)
+    end
 end
 
 ---@param isInitial boolean
