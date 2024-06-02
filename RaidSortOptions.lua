@@ -304,7 +304,6 @@ updateRaidFrames = function(SORTED_RAID_GROUP)
         local player = SORTED_RAID_GROUP[i]
 
         local b = _G["CellRaidFrameHeader"..playerSubGroup][i]
-        Cell.unitButtons.raid.units
         b:SetAttribute("unit", player.unit)
         -- Update OmniCD namespace
         _G[b:GetName()].unit = player.unit
