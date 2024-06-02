@@ -147,6 +147,7 @@ local debug = false
 local updateIsQued = false
 local queuedUpdate = nil
 local playerSubGroup = 1
+local init = true
 
 -- MARK: Sanitize user input
 ---------------------------------------------------------------------------
@@ -245,6 +246,11 @@ end
 ---@param which string
 sortRaidFrames = function(layout, which)
     if not shouldSort() then return end
+    if init then 
+        init = false 
+        addUpdateToQue() 
+        return
+    end
 
     if not INTERNAL_SORT_OPTIONS or not INTERNAL_SPEC_PRIORITY
         or not INTERNAL_NAME_PRIORITY or not INTERNAL_SORT_DIRECTION then
@@ -616,14 +622,10 @@ end
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
 eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
-eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 eventFrame:SetScript("OnEvent", function(self, event)
     if event == "PLAYER_REGEN_ENABLED" then
         handleQueuedUpdate(true)
         return
-    end
-    if event == "PLAYER_ENTERING_WORLD" then
-        sanitizeSortOptions()
     end
 
     addUpdateToQue()
