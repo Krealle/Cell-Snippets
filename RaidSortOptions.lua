@@ -302,9 +302,12 @@ updateRaidFrames = function(SORTED_RAID_GROUP)
     for i = 1, #SORTED_RAID_GROUP do
         ---@type Player
         local player = SORTED_RAID_GROUP[i]
-        _G["CellRaidFrameHeader"..playerSubGroup][i]:SetAttribute("unit", player.unit)
-        -- TODO: update OmniCD namespace
-        --[[ CellPartyFrameHeader:UpdateButtonUnit(CellPartyFrameHeader[i]:GetName(), unit) ]]
+
+        local b = _G["CellRaidFrameHeader"..playerSubGroup][i]
+        Cell.unitButtons.raid.units
+        b:SetAttribute("unit", player.unit)
+        -- Update OmniCD namespace
+        _G[b:GetName()].unit = player.unit
     end
 end
 
