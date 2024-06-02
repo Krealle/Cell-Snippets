@@ -499,6 +499,11 @@ shouldSort = function()
         if queuedUpdate then queuedUpdate:Cancel() end
         return false
     end
+    if Cell.vars.currentLayoutTable["main"]["combineGroups"] then
+        updateIsQued = false
+        if queuedUpdate then queuedUpdate:Cancel() end
+        return false
+    end
     if InCombatLockdown() then 
         updateIsQued = true
         if queuedUpdate then queuedUpdate:Cancel() end
