@@ -184,7 +184,6 @@ sanitizeSortOptions = function()
             Print("Invalid sortOption: " .. (option or "nil"), true)
         end
     end
-    DevAdd(INTERNAL_SORT_OPTIONS, "INTERNAL_SORT_OPTIONS")
 
     INTERNAL_SPEC_PRIORITY = {}
     for i, spec in pairs(SPEC_PRIORITY) do
@@ -194,7 +193,6 @@ sanitizeSortOptions = function()
             Print("Invalid spec: " .. (spec or "nil"), true)
         end
     end
-    DevAdd(INTERNAL_SPEC_PRIORITY, "INTERNAL_SPEC_PRIORITY")
 
     INTERNAL_NAME_PRIORITY = {}
     for i, name in pairs(NAME_PRIORITY) do
@@ -204,7 +202,6 @@ sanitizeSortOptions = function()
             Print("Invalid name: " .. (name or "nil"), true)
         end
     end
-    DevAdd(INTERNAL_NAME_PRIORITY, "INTERNAL_NAME_PRIORITY")
 
     INTERNAL_ROLES_PRIORITY = {}
     for i, role in pairs(ROLE_PRIORITY) do
@@ -214,7 +211,6 @@ sanitizeSortOptions = function()
             Print("Invalid role: " .. (role or "nil"), true)
         end
     end
-    DevAdd(INTERNAL_ROLES_PRIORITY, "INTERNAL_ROLES_PRIORITY")
 
     INTERNAL_SPECROLES_PRIORITY = {}
     for i, specRole in pairs(SPECROLE_PRIORITY) do
@@ -224,7 +220,6 @@ sanitizeSortOptions = function()
             Print("Invalid specRole: " .. (specRole or "nil"), true)
         end
     end
-    DevAdd(INTERNAL_SPECROLES_PRIORITY, "INTERNAL_SPECROLES_PRIORITY")
 
     if sortDirection and VALID_SORT_DIRECTIONS[sortDirection] then
         INTERNAL_SORT_DIRECTION = sortDirection
@@ -232,7 +227,13 @@ sanitizeSortOptions = function()
         Print("Invalid sortDirection - forced to ASC", true)
         INTERNAL_SORT_DIRECTION = "ASC"
     end
-    DevAdd(INTERNAL_SORT_DIRECTION, "INTERNAL_SORT_DIRECTION")
+    DevAdd({INTERNAL_SORT_OPTIONS, 
+            INTERNAL_SPEC_PRIORITY, 
+            INTERNAL_NAME_PRIORITY, 
+            INTERNAL_ROLES_PRIORITY, 
+            INTERNAL_SPECROLES_PRIORITY, 
+            INTERNAL_SORT_DIRECTION}, 
+            "Internal sort options")
 
     if type(QUE_TIMER) ~= "number" or QUE_TIMER < 0.5 then
         Print("Invalid QUE_TIMER - forced to 1", true)
@@ -455,6 +456,7 @@ comparePriority = function(a, b)
 end
 
 ---@param sortOption SortOption
+---@return function SortFunction
 getSortFunction = function(sortOption)
     if sortOption == "PLAYER" then
         return playerSort
@@ -536,8 +538,8 @@ direction = function(bool)
     end
 end
 
----@param a Player
----@param b Player
+---@param aPlayer Player
+---@param bPlayer Player
 ---@return boolean isValid
 ---@return boolean|nil? maybeResult
 isValidPlayers = function(aPlayer, bPlayer)
