@@ -710,7 +710,7 @@ function SlashCmdList.CELLRAIDSORT()
     if InCombatLockdown() then
         Print("Sort queued till after combat")
     else
-        Print("Sorted")
+        Print("Sorting")
     end
 end
 
