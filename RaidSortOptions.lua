@@ -5,18 +5,27 @@
 -- Sorting only works when you are not in combat
 -- Any rooster changes while in combat will be delayed until combat ends
 
--- Additionally, due to the implementation used, when rooster changes happens
+-- Additionally, due to the implementation used, when roster changes happens
 -- the frames will be subjected to blizzards base sorting, and then re-sorted
 -- by this snippet - this is not ideal, but not something we can do much about
 -- since you can't disable blizzards base sorting.
--- There is a single workaround, to my knowledge, but this will not show new players
+-- There is, to my knowledge, a single workaround but this will not show new players
 -- joining mid combat, which potentially is more non-ideal.
+
+-- If "Combine Groups" is enabled the entire raid will be sorted.
+-- If showing player first is the desired outcome, then place "PLAYER"
+-- at the top of "SORTING_ORDER" table.
+-- If using "Sort By Role" you need to add "ROLE" to the table as well.
 
 -- /rsort - Sorts raid frames
 -- /rupdate - Updates sort settings
 
 ---------------------------------------------------------------------------
 -- SET YOUR OPTIONS HERE
+
+-- Use these to supress error/info messages during sorting
+local showErrorMessages = true
+local showInfoMessages = true
 
 -- Build your desired sorting order
 -- Valid options are:
@@ -33,10 +42,6 @@ local SORTING_ORDER = {
     -- "ROLE"
     -- "SPECROLE"
 }
-
--- Use this to supress error/info messages during sorting
-local showErrors = true
-local showInfo = true
 
 -- Whether to sorting Ascending or Descending
 local sortDirection = "ASC" -- "ASC" or "DESC"
@@ -166,7 +171,7 @@ local playerSubGroup = 1
 
 local updateIsQued, queuedUpdate
 local init = true
-local debug = true
+local debug = false
 
 ---@enum PrintType
 PrintType = {
@@ -309,7 +314,7 @@ updateRaidFrames = function(SORTED_RAID_GROUP)
         updateIsQued = true
         return 
     end
-    Print(PrintType.Debug, "updateRaidFrames")
+    Print(PrintType.Debug, "updateRaidFrames - combined:", Cell.vars.currentLayoutTable["main"]["combineGroups"])
     
     --[[ if useNameFilter then
         if CellPartyFrameHeader:GetAttribute("sortMethod") ~= "NAMELIST" then
@@ -327,12 +332,18 @@ updateRaidFrames = function(SORTED_RAID_GROUP)
         return
     end ]]
 
-    Print("updateRaidFrames")
+    local header
+    if Cell.vars.currentLayoutTable["main"]["combineGroups"] then
+        header = _G["CellRaidFrameHeader0"]
+    else
+        header = _G["CellRaidFrameHeader"..playerSubGroup]
+    end
+    
     for i = 1, #SORTED_RAID_GROUP do
         ---@type Player
         local player = SORTED_RAID_GROUP[i]
 
-        local b = _G["CellRaidFrameHeader"..playerSubGroup][i]
+        local b = header[i]
         b:SetAttribute("unit", player.unit)
         -- Update OmniCD namespace
         _G[b:GetName()].unit = player.unit
@@ -346,7 +357,7 @@ end
 ---@param playerB Player
 ---@return boolean|nil
 playerSort = function(playerA, playerB)
-    Print("playerSort")
+    Print(PrintType.Debug, "playerSort")
     if not playerA or not playerB then return nil end
     if not playerA.name and not playerB.name then return nil end
 
@@ -525,10 +536,17 @@ getRaidGroupInfo = function()
     ---@type table<Player>
     UNSORTED_RAID_GROUP = {}
 
-    playerSubGroup = select(2, F:GetRaidInfoByName(playerName))
-    for _, unit in pairs(F:GetUnitsInSubGroup(playerSubGroup)) do
-        local player = getPlayerInfo(unit)
-        tinsert(UNSORTED_RAID_GROUP, player)
+    if Cell.vars.currentLayoutTable["main"]["combineGroups"] then
+        for unit in F:IterateGroupMembers() do
+            local player = getPlayerInfo(unit)
+            tinsert(UNSORTED_RAID_GROUP, player)
+        end
+    else
+        playerSubGroup = select(2, F:GetRaidInfoByName(playerName))
+        for _, unit in pairs(F:GetUnitsInSubGroup(playerSubGroup)) do
+            local player = getPlayerInfo(unit)
+            tinsert(UNSORTED_RAID_GROUP, player)
+        end
     end
 
     DevAdd(UNSORTED_RAID_GROUP, "UNSORTED_RAID_GROUP")
@@ -597,10 +615,6 @@ end
 ---@return boolean
 shouldSort = function()
     if Cell.vars.groupType ~= "raid" then
-        canelQueuedUpdate(true)
-        return false
-    end
-    if Cell.vars.currentLayoutTable["main"]["combineGroups"] then
         canelQueuedUpdate(true)
         return false
     end
@@ -690,12 +704,13 @@ Cell:RegisterCallback("UpdateLayout", "RaidSortOptions_UpdateLayout", RaidFrame_
 -- MARK: Debug
 -------------------------------------------------------
 Print = function(type, ...)
-    if type == PrintType.Debug and debug then
-        print("|cFF7CFC00[RaidSortOptions]|r", ...)
-    elseif type == PrintType.Error and showErrors then
-        print("|cFFFF3030[RaidSortOptions]|r", ...)
-    elseif type == PrintType.Info and showInfo then
-        print("|cffbbbbbb[RaidSortOptions]|r", ...)
+    if type == PrintType.Debug then
+        if not debug then return end
+        print("|cFF7CFC00[RaidSortOptions]|r Debug:", ...)
+    elseif type == PrintType.Error and showErrorMessages then
+        print("|cFFFF3030[RaidSortOptions]|r Error:", ...)
+    elseif type == PrintType.Info and showInfoMessages then
+        print("|cffbbbbbb[RaidSortOptions]|r Info:", ...)
     else
         print("|cffff7777[RaidSortOptions]|r", type, ... )
     end
