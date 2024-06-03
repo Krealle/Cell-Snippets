@@ -174,7 +174,7 @@ local init = true
 local debug = false
 
 ---@enum PrintType
-PrintType = {
+local PrintType = {
 	Debug = 0,
 	Error = 1,
 	Info = 2,
