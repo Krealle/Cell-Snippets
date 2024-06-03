@@ -5,7 +5,12 @@
 -- Sorting only works when you are not in combat
 -- Any rooster changes while in combat will be delayed until combat ends
 
--- Does NOT work if you have "Combine Groups" enabled
+-- Additionally, due to the implementation used, when rooster changes happens
+-- the frames will be subjected to blizzards base sorting, and then re-sorted
+-- by this snippet - this is not ideal, but not something we can do much about
+-- since you can't disable blizzards base sorting.
+-- There is a single workaround, to my knowledge, but this will not show new players
+-- joining mid combat, which potentially is more non-ideal.
 
 -- /rsort - Sorts raid frames
 -- /rupdate - Updates sort settings
@@ -135,19 +140,29 @@ local SPEC_PRIORITY = {
 local F = Cell.funcs
 local LGI = LibStub:GetLibrary("LibGroupInfo")
 
-local shouldSort, sortRaidFrames, RaidFrame_UpdateLayout, addUpdateToQue, handleQueuedUpdate
-local buildRaidInfo, getSortedRaidGroup, updateRaidFrames, getSortFunction
-local Print, DevAdd, sanitizeSortOptions
-local direction, playerSort, specSort, nameSort, roleSort, specRoleSort, comparePriority
-local isValidPlayers, getPlayerInfo, isValidPlayerInfo
+-- Main
+local sortRaidFrames, updateRaidFrames, sanitizeSortOptions
+-- Sorting
+local playerSort, specSort, nameSort, roleSort, specRoleSort
+-- Sort Helpers
+local getSortFunction, comparePriority, direction
+-- Raid Info
+local getSortedRaidGroup, getRaidGroupInfo, getPlayerInfo
+-- Helpers
+local shouldSort, handleQueuedUpdate, addUpdateToQueue, canelQueuedUpdate
+local isValidPlayers, isValidPlayerInfo
+-- Calback
+local RaidFrame_UpdateLayout
+-- Debug
+local Print, DevAdd
+
 -- Vars
-local nameList = {}
 local playerName = GetUnitName("player")
-local debug = false
-local updateIsQued = false
-local queuedUpdate = nil
 local playerSubGroup = 1
+
+local updateIsQued, queuedUpdate
 local init = true
+local debug = false
 
 -- MARK: Sanitize user input
 ---------------------------------------------------------------------------
@@ -247,9 +262,11 @@ end
 ---@param which string
 sortRaidFrames = function(layout, which)
     if not shouldSort() then return end
+    -- We delay initial update to not affect loading time
+    -- Inital call is from "UpdateLayout" fire
     if init then 
         init = false 
-        addUpdateToQue() 
+        addUpdateToQueue() 
         return
     end
 
@@ -442,20 +459,8 @@ specRoleSort = function(playerA, playerB)
     return comparePriority(aPrio, bPrio)
 end
 
----@param a number|nil
----@param b number|nil
----@return boolean|nil
-comparePriority = function(a, b)
-    if a and b then
-        return a < b
-    elseif a then
-        return true
-    elseif b then
-        return false
-    end
-
-    return nil
-end
+-- MARK: Sorting helper functions
+-------------------------------------------------------
 
 ---@param sortOption SortOption
 ---@return function SortFunction
@@ -473,11 +478,77 @@ getSortFunction = function(sortOption)
     end
 end
 
--- MARK: Helper functions
+---@param a number|nil
+---@param b number|nil
+---@return boolean|nil
+comparePriority = function(a, b)
+    if a and b then
+        return a < b
+    elseif a then
+        return true
+    elseif b then
+        return false
+    end
+
+    return nil
+end
+
+--- Normalize the sort direction
+---@param bool boolean
+---@return boolean
+direction = function(bool) 
+    if INTERNAL_SORT_DIRECTION == "ASC" then 
+        return bool 
+    else 
+        return not bool  
+    end
+end
+
+-- MARK: Raid Info functions
 -------------------------------------------------------
 
+---@param UNSORTED_RAID_GROUP table<Player>
+---@return table<Player> SORTED_RAID_GROUP
+getSortedRaidGroup = function(UNSORTED_RAID_GROUP)
+    if not UNSORTED_RAID_GROUP then return end
+    
+    ---@type table<Player>
+    local SORTED_RAID_GROUP = debug and F:Copy(UNSORTED_RAID_GROUP) or UNSORTED_RAID_GROUP
+
+    table.sort(SORTED_RAID_GROUP,
+    ---@param playerA Player
+    ---@param playerB Player
+    function(playerA, playerB)
+        local isValidData, maybeResult = isValidPlayers(playerA, playerB)
+        if not isValidData then
+            Print("invalid data " .. (maybeResult and "true" or maybeResult ~= nil and "false" or "nil"))
+            if maybeResult ~= nil then
+                return direction(maybeResult)
+            end
+            return direction(playerA.unit < playerB.unit)
+        end
+
+        if debug then print("") end
+        Print("sort: ".. playerA.name.."("..playerA.unit..") ".. playerB.name.."("..playerB.unit..") ==>")
+
+        for sortOption, sortFunction in pairs(INTERNAL_SORT_OPTIONS) do
+            local maybeResult = sortFunction(playerA, playerB)
+            if maybeResult ~= nil then
+                return direction(maybeResult)
+            end
+        end
+
+        Print("Fallback")
+        return direction(playerA.unit < playerB.unit)
+    end)
+
+    DevAdd(SORTED_RAID_GROUP, "SORTED_RAID_GROUP")
+
+    return SORTED_RAID_GROUP
+end
+
 ---@return table<Player> UNSORTED_RAID_GROUP
-buildRaidInfo = function()
+getRaidGroupInfo = function()
     Print("buildRaidInfo")
     ---@type table<Player>
     UNSORTED_RAID_GROUP = {}
@@ -492,85 +563,7 @@ buildRaidInfo = function()
     return UNSORTED_RAID_GROUP
 end
 
----@return boolean
-shouldSort = function()
-    if Cell.vars.groupType ~= "raid" then
-        updateIsQued = false
-        if queuedUpdate then queuedUpdate:Cancel() end
-        return false
-    end
-    if Cell.vars.currentLayoutTable["main"]["combineGroups"] then
-        updateIsQued = false
-        if queuedUpdate then queuedUpdate:Cancel() end
-        return false
-    end
-    if InCombatLockdown() then 
-        updateIsQued = true
-        if queuedUpdate then queuedUpdate:Cancel() end
-        return false
-    end
-
-    return true
-end
-
-handleQueuedUpdate = function()
-    if not updateIsQued or not shouldSort() then return end
-    
-    updateIsQued = false
-    sortRaidFrames()
-end
-
-addUpdateToQue = function()
-    if not shouldSort() then return end
-
-    -- Reset our queued update if we get new update requests
-    -- eg. lots of new players joining or leaving
-    -- no need to keep sorting 
-    if updateIsQued and queuedUpdate then
-        queuedUpdate:Cancel()
-    end
-
-    updateIsQued = true
-    queuedUpdate = C_Timer.NewTimer(QUE_TIMER, handleQueuedUpdate)
-end
-
---- Normalize the sort direction
----@param bool boolean
----@return boolean
-direction = function(bool) 
-    if INTERNAL_SORT_DIRECTION == "ASC" then 
-        return bool 
-    else 
-        return not bool  
-    end
-end
-
----@param aPlayer Player
----@param bPlayer Player
----@return boolean isValid
----@return boolean|nil? maybeResult
-isValidPlayers = function(aPlayer, bPlayer)
-    if not aPlayer and not bPlayer then 
-        Print("both nil")
-        return false, nil
-    elseif not aPlayer then
-        Print("aPlayer nil")
-        return false, false
-    elseif not bPlayer then
-        Print("bPlayer nil")
-        return false, true
-    end
-    return true
-end
-
----@param info CachedPlayerInfo
----@return boolean
-isValidPlayerInfo = function(info)
-    return info and info.specId and info.specRole 
-            and info.role and info.name and info.realm
-end
-
----@param guid string
+---@param unit string
 ---@return Player player
 getPlayerInfo = function(unit)
     local guid = UnitGUID(unit)
@@ -626,6 +619,82 @@ getPlayerInfo = function(unit)
     end
 end
 
+-- MARK: Helper functions
+-------------------------------------------------------
+
+---@return boolean
+shouldSort = function()
+    if Cell.vars.groupType ~= "raid" then
+        canelQueuedUpdate(true)
+        return false
+    end
+    if Cell.vars.currentLayoutTable["main"]["combineGroups"] then
+        canelQueuedUpdate(true)
+        return false
+    end
+    if InCombatLockdown() then 
+        canelQueuedUpdate()
+        return false
+    end
+
+    return true
+end
+
+handleQueuedUpdate = function()
+    if not updateIsQued or not shouldSort() then return end
+    
+    updateIsQued = false
+    sortRaidFrames()
+end
+
+addUpdateToQueue = function()
+    if not shouldSort() then return end
+
+    -- Reset our queued update if we get new update requests
+    -- eg. lots of new players joining or leaving
+    -- no need to keep sorting 
+    if updateIsQued and queuedUpdate then
+        queuedUpdate:Cancel()
+    end
+
+    updateIsQued = true
+    queuedUpdate = C_Timer.NewTimer(QUE_TIMER, handleQueuedUpdate)
+end
+
+--- Cancels queued update timer. fullReset will reset updateIsQued 
+---@param fullReset boolean
+canelQueuedUpdate = function(fullReset)
+    if fullReset then updateIsQued = false end
+    if queuedUpdate then queuedUpdate:Cancel() end
+end
+
+--- Checks if two players are valid.
+--- Will return maybeResult if either/both are nil
+---@param aPlayer Player
+---@param bPlayer Player
+---@return boolean isValid
+---@return boolean|nil? maybeResult
+isValidPlayers = function(aPlayer, bPlayer)
+    if not aPlayer and not bPlayer then 
+        Print("both nil")
+        return false, nil
+    elseif not aPlayer then
+        Print("aPlayer nil")
+        return false, false
+    elseif not bPlayer then
+        Print("bPlayer nil")
+        return false, true
+    end
+    return true
+end
+
+---@param info CachedPlayerInfo
+---@return boolean
+isValidPlayerInfo = function(info)
+    return info and info.specId and info.specRole 
+            and info.role and info.name and info.realm
+end
+
 -- MARK: Events
 -------------------------------------------------------
 local eventFrame = CreateFrame("Frame")
@@ -637,13 +706,12 @@ eventFrame:SetScript("OnEvent", function(self, event)
         return
     end
 
-    addUpdateToQue()
+    addUpdateToQueue()
 end)
-
 -- MARK: Callback
 -------------------------------------------------------
 RaidFrame_UpdateLayout = function()
-    addUpdateToQue()
+    addUpdateToQueue()
 end
 Cell:RegisterCallback("UpdateLayout", "RaidSortOptions_UpdateLayout", RaidFrame_UpdateLayout)
 
