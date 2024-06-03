@@ -176,7 +176,7 @@ shouldSort = function(layout)
     local playerRole = UnitGroupRolesAssigned("player")
     Print("shouldSort - playerRole:" .. playerRole .. " sortByRole:" .. (layout["main"]["sortByRole"] and "true" or "false"))
     return (layout["main"]["sortByRole"] and playerRole == "DAMAGER")
-            or playerRole ~= "NONE"
+            or (not layout["main"]["sortByRole"]) and playerRole ~= "NONE"
 end
 
 ---@param nameList table<string>
