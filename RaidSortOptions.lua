@@ -34,6 +34,10 @@ local SORTING_ORDER = {
     -- "SPECROLE"
 }
 
+-- Use this to supress error/info messages during sorting
+local showErrors = true
+local showInfo = true
+
 -- Whether to sorting Ascending or Descending
 local sortDirection = "ASC" -- "ASC" or "DESC"
 
@@ -162,7 +166,14 @@ local playerSubGroup = 1
 
 local updateIsQued, queuedUpdate
 local init = true
-local debug = false
+local debug = true
+
+---@enum PrintType
+PrintType = {
+	Debug = 0,
+	Error = 1,
+	Info = 2,
+}
 
 -- MARK: Sanitize user input
 ---------------------------------------------------------------------------
@@ -193,10 +204,10 @@ sanitizeSortOptions = function()
             if type(sortFunction) == "function" then
                 tinsert(INTERNAL_SORT_OPTIONS, sortFunction)
             else
-                Print("Failed to find sort function for: " .. option .. " this is an error on my part, please report it.", true)
+                Print("Failed to find sort function for: ", option, " this is an error on my part, please report it.")
             end
         else
-            Print("Invalid sortOption: " .. (option or "nil"), true)
+            Print(PrintType.Info, "Invalid sortOption: ", option)
         end
     end
 
@@ -205,7 +216,7 @@ sanitizeSortOptions = function()
         if spec and type(spec) == "number" then
             INTERNAL_SPEC_PRIORITY[spec] = i
         else
-            Print("Invalid spec: " .. (spec or "nil"), true)
+            Print(PrintType.Info, "Invalid spec: ", spec)
         end
     end
 
@@ -214,7 +225,7 @@ sanitizeSortOptions = function()
         if name and type(name) == "string" then
             INTERNAL_NAME_PRIORITY[name] = i
         else
-            Print("Invalid name: " .. (name or "nil"), true)
+            Print(PrintType.Info, "Invalid name: ", name)
         end
     end
 
@@ -223,7 +234,7 @@ sanitizeSortOptions = function()
         if role and VALID_ROLES[role] then
             INTERNAL_ROLES_PRIORITY[role] = i
         else
-            Print("Invalid role: " .. (role or "nil"), true)
+            Print(PrintType.Info, "Invalid role: ", role)
         end
     end
 
@@ -232,14 +243,14 @@ sanitizeSortOptions = function()
         if specRole and VALID_SPECROLES[specRole] then
             INTERNAL_SPECROLES_PRIORITY[specRole] = i
         else
-            Print("Invalid specRole: " .. (specRole or "nil"), true)
+            Print(PrintType.Info, "Invalid specRole: ", specRole)
         end
     end
 
     if sortDirection and VALID_SORT_DIRECTIONS[sortDirection] then
         INTERNAL_SORT_DIRECTION = sortDirection
     else
-        Print("Invalid sortDirection - forced to ASC", true)
+        Print(PrintType.Info, "Invalid sortDirection - forced to ASC")
         INTERNAL_SORT_DIRECTION = "ASC"
     end
     DevAdd({INTERNAL_SORT_OPTIONS, 
@@ -251,7 +262,7 @@ sanitizeSortOptions = function()
             "Internal sort options")
 
     if type(QUE_TIMER) ~= "number" or QUE_TIMER < 0.5 then
-        Print("Invalid QUE_TIMER - forced to 1", true)
+        Print(PrintType.Info, "Invalid QUE_TIMER - forced to 1")
         QUE_TIMER = 1
     end
 end
@@ -272,19 +283,19 @@ sortRaidFrames = function(layout, which)
 
     if not INTERNAL_SORT_OPTIONS or not INTERNAL_SPEC_PRIORITY
         or not INTERNAL_NAME_PRIORITY or not INTERNAL_SORT_DIRECTION then
-        Print("We need to sanitize first")
+        Print(PrintType.Debug, "We need to sanitize first")
         sanitizeSortOptions()
     end
 
-    local UNSORTED_RAID_GROUP = buildRaidInfo()
+    local UNSORTED_RAID_GROUP = getRaidGroupInfo()
     if not UNSORTED_RAID_GROUP then
-        Print("Found no players in group.", true)
+        Print(PrintType.Info, "Found no players in group.")
         return
     end
 
     local SORTED_RAID_GROUP = getSortedRaidGroup(UNSORTED_RAID_GROUP)
     if not SORTED_RAID_GROUP then
-        Print("Failed to sort group.", true)
+        Print(PrintType.Info, "Failed to sort group.")
         return
     end
     
@@ -298,6 +309,7 @@ updateRaidFrames = function(SORTED_RAID_GROUP)
         updateIsQued = true
         return 
     end
+    Print(PrintType.Debug, "updateRaidFrames")
     
     --[[ if useNameFilter then
         if CellPartyFrameHeader:GetAttribute("sortMethod") ~= "NAMELIST" then
@@ -391,7 +403,7 @@ end
 ---@param playerB Player
 ---@return boolean|nil
 specSort = function(playerA, playerB)
-    Print("specSort")
+    Print(PrintType.Debug, "specSort")
     if not playerA or not playerB then return nil end
 
     local aSpec, bSpec = playerA.specId, playerB.specId
@@ -401,7 +413,7 @@ specSort = function(playerA, playerB)
     local bPrio = INTERNAL_SPEC_PRIORITY[bSpec]
     if not aPrio and not bPrio then return nil end
 
-    Print(aSpec .. "(".. (aPrio or "n/a") .. ") " .. bSpec .. "(".. (bPrio or "n/a") .. ")")
+    Print(PrintType.Debug, aSpec, "(", aPrio, ") ", bSpec, "(", bPrio, ")")
     return comparePriority(aPrio, bPrio)
 end
 
@@ -419,7 +431,7 @@ nameSort = function(playerA, playerB)
     local bPrio = INTERNAL_NAME_PRIORITY[bName]
     if not aPrio and not bPrio then return nil end
 
-    Print(aName .. "(".. (aPrio or "n/a") .. ") " .. bName .. "(".. (bPrio or "n/a") .. ")")
+    Print(PrintType.Debug, aName, "(", aPrio, ") ", bName, "(", bPrio, ")")
     return comparePriority(aPrio, bPrio)   
 end
 
@@ -437,7 +449,7 @@ roleSort = function(playerA, playerB)
     local bPrio = INTERNAL_ROLES_PRIORITY[bRole]
     if not aPrio and not bPrio then return nil end
 
-    Print(aRole .. "(".. (aPrio or "n/a") .. ") " .. bRole .. "(".. (bPrio or "n/a") .. ")")
+    Print(PrintType.Debug, aRole, "(", aPrio, ") ", bRole, "(", bPrio, ")")
     return comparePriority(aPrio, bPrio)
 end
 
@@ -455,7 +467,7 @@ specRoleSort = function(playerA, playerB)
     local bPrio = INTERNAL_SPECROLES_PRIORITY[bSpecRole]
     if not aPrio and not bPrio then return nil end
 
-    Print(aSpecRole .. "(".. (aPrio or "n/a") .. ") " .. bSpecRole .. "(".. (bPrio or "n/a") .. ")")
+    Print(PrintType.Debug, aSpecRole, "(", aPrio, ") ", bSpecRole, "(", bPrio, ")")
     return comparePriority(aPrio, bPrio)
 end
 
@@ -521,7 +533,7 @@ getSortedRaidGroup = function(UNSORTED_RAID_GROUP)
     function(playerA, playerB)
         local isValidData, maybeResult = isValidPlayers(playerA, playerB)
         if not isValidData then
-            Print("invalid data " .. (maybeResult and "true" or maybeResult ~= nil and "false" or "nil"))
+            Print(PrintType.Debug, "invalid data ", maybeResult)
             if maybeResult ~= nil then
                 return direction(maybeResult)
             end
@@ -529,7 +541,7 @@ getSortedRaidGroup = function(UNSORTED_RAID_GROUP)
         end
 
         if debug then print("") end
-        Print("sort: ".. playerA.name.."("..playerA.unit..") ".. playerB.name.."("..playerB.unit..") ==>")
+        Print(PrintType.Debug, "sort: ", playerA.name, "(", playerA.unit, ") ", playerB.name,"(", playerB.unit, ") ==>")
 
         for sortOption, sortFunction in pairs(INTERNAL_SORT_OPTIONS) do
             local maybeResult = sortFunction(playerA, playerB)
@@ -538,7 +550,7 @@ getSortedRaidGroup = function(UNSORTED_RAID_GROUP)
             end
         end
 
-        Print("Fallback")
+        Print(PrintType.Debug, "Fallback")
         return direction(playerA.unit < playerB.unit)
     end)
 
@@ -549,7 +561,7 @@ end
 
 ---@return table<Player> UNSORTED_RAID_GROUP
 getRaidGroupInfo = function()
-    Print("buildRaidInfo")
+    Print(PrintType.Debug, "getRaidGroupInfo")
     ---@type table<Player>
     UNSORTED_RAID_GROUP = {}
 
@@ -586,7 +598,7 @@ getPlayerInfo = function(unit)
         local raidIndex = tonumber(select(2, string.match(unit, "^(raid)(%d+)$")))
         if not raidIndex then
             local name, realm = UnitName(unit)
-            Print("Unable to find spec info for " .. name .. "-" .. realm, true)
+            Print(PrintType.Info, "Unable to find spec info for", (name or "n/a") .. "-" .. (realm or "n/a"))
             return {
                 name = name,
                 realm = realm,
@@ -603,7 +615,7 @@ getPlayerInfo = function(unit)
 
         DevAdd({name, realm, rank, subGroup, level, class, fileName, zone, online, isDead, role, isML, combatRole}, unit)
         
-        Print("Unable to find spec info for " .. name .. "-" .. realm, true)
+        Print(PrintType.Info, "Unable to find spec info for", (name or "n/a") .. "-" .. (realm or "n/a"))
         return {
             name = name,
             realm = realm,
@@ -676,13 +688,13 @@ end
 ---@return boolean|nil? maybeResult
 isValidPlayers = function(aPlayer, bPlayer)
     if not aPlayer and not bPlayer then 
-        Print("both nil")
+        Print(PrintType.Debug, "both nil")
         return false, nil
     elseif not aPlayer then
-        Print("aPlayer nil")
+        Print(PrintType.Debug, "aPlayer nil")
         return false, false
     elseif not bPlayer then
-        Print("bPlayer nil")
+        Print(PrintType.Debug, "bPlayer nil")
         return false, true
     end
     return true
@@ -717,10 +729,16 @@ Cell:RegisterCallback("UpdateLayout", "RaidSortOptions_UpdateLayout", RaidFrame_
 
 -- MARK: Debug
 -------------------------------------------------------
-Print = function(msg, isErr, isInfo) 
-    if isErr then F:Print("RaidSortOptions: |cFFFF3030" .. msg .. "|r")
-    elseif isInfo then F:Print("RaidSortOptions: " .. msg)
-    elseif debug then F:Print("RaidSortOptions: " .. msg) end
+Print = function(type, ...)
+    if type == PrintType.Debug and debug then
+        print("|cFF7CFC00[RaidSortOptions]|r", ...)
+    elseif type == PrintType.Error and showErrors then
+        print("|cFFFF3030[RaidSortOptions]|r", ...)
+    elseif type == PrintType.Info and showInfo then
+        print("|cffbbbbbb[RaidSortOptions]|r", ...)
+    else
+        print("|cffff7777[RaidSortOptions]|r", type, ... )
+    end
 end
 DevAdd = function(data, name) if debug and DevTool then DevTool:AddData(data, name) end end
 
@@ -730,16 +748,16 @@ SLASH_CELLRAIDSORT1 = "/rsort"
 function SlashCmdList.CELLRAIDSORT()
     sortRaidFrames()
     if InCombatLockdown() then
-        Print("Sort queued till after combat", false, true)
+        Print("Sort queued till after combat")
     else
-        Print("Sorted", false, true)
+        Print("Sorted")
     end
 end
 
 SLASH_CELLRAIDSORTUPDATE1 = "/rupdate"
 function SlashCmdList.CELLRAIDSORTUPDATE()
     sanitizeSortOptions()
-    Print("Updated sort options", false, true)
+    Print("Updated sort options")
 end
 
 -- MARK: Annotations
