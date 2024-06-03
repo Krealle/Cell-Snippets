@@ -392,7 +392,7 @@ end
 ---@param playerB Player
 ---@return boolean|nil
 nameSort = function(playerA, playerB)
-    Print("nameSort")
+    Print(PrintType.Debug, "nameSort")
     if not playerA or not playerB then return nil end
     
     local aName, bName = playerA.name, playerB.name
@@ -410,7 +410,7 @@ end
 ---@param playerB Player
 ---@return boolean|nil
 roleSort = function(playerA, playerB)
-    Print("roleSort")
+    Print(PrintType.Debug, "roleSort")
     if not playerA or not playerB then return nil end
 
     local aRole, bRole = playerA.role, playerB.role
@@ -428,7 +428,7 @@ end
 ---@param playerB Player
 ---@return boolean|nil
 specRoleSort = function(playerA, playerB)
-    Print("specRoleSort")
+    Print(PrintType.Debug, "specRoleSort")
     if not playerA or not playerB then return nil end
 
     local aSpecRole, bSpecRole = playerA.specRole, playerB.specRole
