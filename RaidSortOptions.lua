@@ -3,7 +3,7 @@
 -- IMPORTANT: 
 -- Due to how SecureFrames are handled in combat, and the implementation
 -- Sorting only works when you are not in combat
--- Any rooster changes while in combat will be delayed until combat ends
+-- Any roster changes while in combat will be delayed until combat ends
 
 -- Additionally, due to the implementation used, when roster changes happens
 -- the frames will be subjected to blizzards base sorting, and then re-sorted
