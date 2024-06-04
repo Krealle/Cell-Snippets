@@ -2,6 +2,9 @@
 
 Various snippets I've made for the addon [Cell](https://www.curseforge.com/wow/addons/cell).
 
+> [!IMPORTANT]
+> These snippets are not made, nor maintained, by Cell's developer, so please don't ask them about any issues you might be experiencing.
+
 ### DebuffAuraAnchor
 
 <details><summary>
