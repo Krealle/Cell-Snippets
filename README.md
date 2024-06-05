@@ -2,6 +2,9 @@
 
 Various snippets I've made for the addon [Cell](https://www.curseforge.com/wow/addons/cell).
 
+> [!IMPORTANT]
+> These snippets are not made, nor maintained, by Cell's developer, so please don't ask them about any issues you might be experiencing.
+
 ### DebuffAuraAnchor
 
 <details><summary>
@@ -48,8 +51,7 @@ Todo:
 Adds more sorting options for your raid!
 </summary>
 
-> [!IMPORTANT]
-> Important information below, make sure read this before using, or asking for help!
+**Imporant:** Important information below, make sure read this before using, or asking for help!
 
 **1. Sorting does not work in combat!**
 
@@ -95,8 +97,7 @@ local SORTING_ORDER = {
 
 Choose the order in which to show players, based on their names.
 
-> [!NOTE]
-> Currently this only supports `Name` format, so don't try to add `-Realm` suffix.
+**NOTE:** Currently this only supports `Name` format, so don't try to add `-Realm` suffix.
 
 ```
 local NAME_PRIORITY = {"Xephyris","Entro"}
@@ -114,8 +115,7 @@ local ROLE_PRIORITY = {"HEALER","DAMAGER","TANK"}
 
 Choose the order in which to show players, based on their spec roles.
 
-> [!NOTE]
-> If no spec information can be found for a player, they will be defaulted to their normal role, eg. `RANGED` will show up as `DAMAGER`
+**NOTE:** If no spec information can be found for a player, they will be defaulted to their normal role, eg. `RANGED` will show up as `DAMAGER`
 
 ```
 local SPECROLE_PRIORITY = {"RANGED","MELEE","DAMAGER","HEALER","TANK"}
@@ -125,8 +125,7 @@ local SPECROLE_PRIORITY = {"RANGED","MELEE","DAMAGER","HEALER","TANK"}
 
 Choose the order in which to show players, based on their specs.
 
-> [!NOTE]
-> Spec information is not always available.
+**NOTE:** Spec information is not always available.
 
 ```
 local SPEC_PRIORITY = {
