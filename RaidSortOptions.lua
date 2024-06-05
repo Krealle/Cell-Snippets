@@ -537,9 +537,12 @@ getRaidGroupInfo = function()
     UNSORTED_RAID_GROUP = {}
 
     if Cell.vars.currentLayoutTable["main"]["combineGroups"] then
+        local groupFilter = Cell.vars.currentLayoutTable["groupFilter"]
         for unit in F:IterateGroupMembers() do
             local player = getPlayerInfo(unit)
-            tinsert(UNSORTED_RAID_GROUP, player)
+            if groupFilter[player.subGroup] then
+                tinsert(UNSORTED_RAID_GROUP, player)
+            end
         end
     else
         playerSubGroup = select(2, F:GetRaidInfoByName(playerName))
@@ -558,22 +561,24 @@ end
 getPlayerInfo = function(unit)
     local guid = UnitGUID(unit)
 
+    local raidIndex = tonumber(select(2, string.match(unit, "^(raid)(%d+)$")))
     ---@type CachedPlayerInfo
     local cachedInfo = LGI:GetCachedInfo(guid)
     if isValidPlayerInfo(cachedInfo) then 
         DevAdd(cachedInfo, unit)
+        local subGroup = raidIndex and select(3, GetRaidRosterInfo(raidIndex)) or 1
+
         return {
             name = cachedInfo.name,
             realm = cachedInfo.realm,
             unit = unit,
             guid = guid,
-            subGroup = playerSubGroup,
+            subGroup = subGroup,
             role = cachedInfo.role,
             specId = cachedInfo.specId,
             specRole = cachedInfo.specRole,
         }
     else
-        local raidIndex = tonumber(select(2, string.match(unit, "^(raid)(%d+)$")))
         if not raidIndex then
             local name, realm = UnitName(unit)
             Print(PrintType.Info, "Unable to find spec info for", (name or "n/a") .. "-" .. (realm or "n/a"))
