@@ -1,6 +1,6 @@
 -- More options for raid sorting
 
--- IMPORTANT: 
+-- IMPORTANT:
 -- Due to how SecureFrames are handled in combat, and the implementation
 -- Sorting only works when you are not in combat
 -- Any roster changes while in combat will be delayed until combat ends
@@ -25,7 +25,7 @@
 
 -- Use these to supress error/info messages during sorting
 local showErrorMessages = true
-local showInfoMessages = true
+local showInfoMessages = false
 
 -- Build your desired sorting order
 -- Valid options are:
@@ -38,13 +38,17 @@ local showInfoMessages = true
 local SORTING_ORDER = {
     "PLAYER",
     "NAME",
+    "ROLE",
     "SPEC",
-    -- "ROLE"
     -- "SPECROLE"
 }
 
 -- Whether to sorting Ascending or Descending
 local sortDirection = "ASC" -- "ASC" or "DESC"
+
+-- Only sort your own group.
+-- Has no effect when "Combine Groups" is enabled
+local ONLY_SORT_MY_GROUP = false
 
 -- How long in seconds to wait before updating raid frames
 -- Should be kept high to prevent oversorting on rapid roster changes
@@ -53,15 +57,15 @@ local QUE_TIMER = 1
 
 -- Top of list = highest priority
 -- No support for "-Realm" suffix, so don't add it.
-local NAME_PRIORITY = {"Xephyris","Entro"}
+local NAME_PRIORITY = { "Xephyris", "Entro" }
 
 -- Top of list = highest priority
-local ROLE_PRIORITY = {"HEALER","DAMAGER","TANK"}
+local ROLE_PRIORITY = { "TANK", "HEALER", "DAMAGER" }
 
 -- Top of list = highest priority
 -- When spec can't be found for a player, this will default to their role
 -- eg. dps with no found spec will default to "DAMAGER"
-local SPECROLE_PRIORITY = {"RANGED","MELEE","DAMAGER","HEALER","TANK"}
+local SPECROLE_PRIORITY = { "RANGED", "MELEE", "DAMAGER", "HEALER", "TANK" }
 
 -- Top of list = highest priority
 local SPEC_PRIORITY = {
@@ -72,44 +76,44 @@ local SPEC_PRIORITY = {
     103, -- Druid - Feral
     255, -- Hunter - Survival
     269, -- Monk - Windwalker
-    70, -- Paladin - Retribution
+    70,  -- Paladin - Retribution
     259, -- Rogue - Assassination
     260, -- Rogue - Combat
     261, -- Rogue - Subtlety
     263, -- Shaman - Enhancement
-    71, -- Warrior - Arms
-    72, -- Warrior - Fury
+    71,  -- Warrior - Arms
+    72,  -- Warrior - Fury
 
     -- Ranged
-    253, -- Hunter - Beast 野兽控制
-    254, -- Hunter - Marksmanship
-    102, -- Druid - Balance
+    253,  -- Hunter - Beast 野兽控制
+    254,  -- Hunter - Marksmanship
+    102,  -- Druid - Balance
     1467, -- Evoker - Devastation
-    62, -- Mage - Arcane
-    63, -- Mage - Fire
-    64, -- Mage - Frost
-    258, -- Priest - Shadow
-    262, -- Shaman - Elemental
-    265, -- Warlock - Affliction
-    266, -- Warlock - Demonology
-    267, -- Warlock - Destruction
+    62,   -- Mage - Arcane
+    63,   -- Mage - Fire
+    64,   -- Mage - Frost
+    258,  -- Priest - Shadow
+    262,  -- Shaman - Elemental
+    265,  -- Warlock - Affliction
+    266,  -- Warlock - Demonology
+    267,  -- Warlock - Destruction
 
     -- Healer
-    105, -- Druid - Restoration
+    105,  -- Druid - Restoration
     1468, -- Evoker - Preservation
-    270, -- Monk - Mistweaver
-    65, -- Paladin - Holy
-    256, -- Priest - Discipline
-    257, -- Priest - Holy
-    264, -- Shaman - Restoration
+    270,  -- Monk - Mistweaver
+    65,   -- Paladin - Holy
+    256,  -- Priest - Discipline
+    257,  -- Priest - Holy
+    264,  -- Shaman - Restoration
 
     -- Tank
     250, -- Death Knight - Blood
     581, -- Demon Hunter - Vengeance
     104, -- Druid - Guardian
     268, -- Monk - Brewmaster
-    66, -- Paladin - Protection
-    73, -- Warrior - Protection
+    66,  -- Paladin - Protection
+    73,  -- Warrior - Protection
 
     -- Support
     1473, -- Evoker - Augmentation
@@ -128,10 +132,10 @@ local SPEC_PRIORITY = {
 -- Where to place the player
 -- Ideally use sortingPriority over this unless you need a very specific position
 -- Valid range: 1-5
--- local fixedPlayerIndex = 1 
+-- local fixedPlayerIndex = 1
 -- local useFixedPlayedIndex = false
 
--- This will maintain strict group order on roster changes in combat 
+-- This will maintain strict group order on roster changes in combat
 -- but will not show new group members until combat ends.
 -- Recommend to keep it off unless you expect a lot of changes in combat
 -- without the players in the group changing
@@ -156,7 +160,7 @@ local playerSort, specSort, nameSort, roleSort, specRoleSort
 -- Sort Helpers
 local getSortFunction, comparePriority, direction
 -- Raid Info
-local getSortedRaidGroup, getRaidGroupInfo, getPlayerInfo
+local getSortedRaidGroup, getRaidGroupInfo, getPlayerInfo, getUnits
 -- Helpers
 local shouldSort, handleQueuedUpdate, addUpdateToQueue, canelQueuedUpdate
 local isValidPlayers, isValidPlayerInfo
@@ -175,18 +179,23 @@ local debug = false
 
 ---@enum PrintType
 local PrintType = {
-	Debug = 0,
-	Error = 1,
-	Info = 2,
+    Debug = 0,
+    Error = 1,
+    Info = 2,
 }
 
 -- MARK: Sanitize user input
 ---------------------------------------------------------------------------
-local VALID_SORT_OPTIONS = {["PLAYER"] = true, ["SPEC"] = true, ["NAME"] = true, ["ROLE"] = true, ["SPECROLE"] = true}
-local VALID_SORT_DIRECTIONS = {["ASC"] = true, ["DESC"] = true}
-local VALID_ROLES = {["DAMAGER"] = true, ["HEALER"] = true, ["TANK"] = true}
-local VALID_SPECROLES = {["RANGED"] = true, ["MELEE"] = true, 
-                        ["DAMAGER"] = true, ["HEALER"] = true, ["TANK"] = true}
+local VALID_SORT_OPTIONS = { ["PLAYER"] = true, ["SPEC"] = true, ["NAME"] = true, ["ROLE"] = true, ["SPECROLE"] = true }
+local VALID_SORT_DIRECTIONS = { ["ASC"] = true, ["DESC"] = true }
+local VALID_ROLES = { ["DAMAGER"] = true, ["HEALER"] = true, ["TANK"] = true }
+local VALID_SPECROLES = {
+    ["RANGED"] = true,
+    ["MELEE"] = true,
+    ["DAMAGER"] = true,
+    ["HEALER"] = true,
+    ["TANK"] = true
+}
 
 ---@type table<SortOption, function>
 local INTERNAL_SORT_OPTIONS
@@ -258,64 +267,73 @@ sanitizeSortOptions = function()
         Print(PrintType.Info, "Invalid sortDirection - forced to ASC")
         INTERNAL_SORT_DIRECTION = "ASC"
     end
-    DevAdd({INTERNAL_SORT_OPTIONS, 
-            INTERNAL_SPEC_PRIORITY, 
-            INTERNAL_NAME_PRIORITY, 
-            INTERNAL_ROLES_PRIORITY, 
-            INTERNAL_SPECROLES_PRIORITY, 
-            INTERNAL_SORT_DIRECTION}, 
-            "Internal sort options")
-
     if type(QUE_TIMER) ~= "number" or QUE_TIMER < 0.5 then
         Print(PrintType.Info, "Invalid QUE_TIMER - forced to 1")
         QUE_TIMER = 1
     end
+    if type(showErrorMessages) ~= "boolean" then
+        Print(PrintType.Info, "Invalid showErrorMessages - forced to false")
+        showErrorMessages = false
+    end
+    if type(showInfoMessages) ~= "boolean" then
+        Print(PrintType.Info, "Invalid showInfoMessages - forced to false")
+        showInfoMessages = false
+    end
+    if type(ONLY_SORT_MY_GROUP) ~= "boolean" then
+        Print(PrintType.Info, "Invalid ONLY_SORT_MY_GROUP - forced to false")
+        ONLY_SORT_MY_GROUP = false
+    end
+
+    --[[ DevAdd({ INTERNAL_SORT_OPTIONS,
+            INTERNAL_SPEC_PRIORITY,
+            INTERNAL_NAME_PRIORITY,
+            INTERNAL_ROLES_PRIORITY,
+            INTERNAL_SPECROLES_PRIORITY,
+            INTERNAL_SORT_DIRECTION },
+        "Internal sort options") ]]
 end
 
 -- MARK: Main functions
 -------------------------------------------------------
----@param layout string
----@param which string
-sortRaidFrames = function(layout, which)
+sortRaidFrames = function()
     if not shouldSort() then return end
     -- We delay initial update to not affect loading time
     -- Inital call is from "UpdateLayout" fire
-    if init then 
-        init = false 
-        addUpdateToQueue() 
+    if init then
+        init = false
+        addUpdateToQueue()
         return
     end
 
-    if not INTERNAL_SORT_OPTIONS or not INTERNAL_SPEC_PRIORITY
-        or not INTERNAL_NAME_PRIORITY or not INTERNAL_SORT_DIRECTION then
+    if not INTERNAL_SORT_OPTIONS then
         Print(PrintType.Debug, "We need to sanitize first")
         sanitizeSortOptions()
     end
 
-    local UNSORTED_RAID_GROUP = getRaidGroupInfo()
-    if not UNSORTED_RAID_GROUP then
+    local UNSORTED_RAID_GROUPS = getRaidGroupInfo()
+    if not UNSORTED_RAID_GROUPS then
         Print(PrintType.Info, "Found no players in group.")
         return
     end
 
-    local SORTED_RAID_GROUP = getSortedRaidGroup(UNSORTED_RAID_GROUP)
-    if not SORTED_RAID_GROUP then
+    local SORTED_RAID_GROUPS = getSortedRaidGroup(UNSORTED_RAID_GROUPS)
+    if not SORTED_RAID_GROUPS then
         Print(PrintType.Info, "Failed to sort group.")
         return
     end
-    
-    updateRaidFrames(SORTED_RAID_GROUP)
+
+    updateRaidFrames(SORTED_RAID_GROUPS)
 end
 
----@param SORTED_RAID_GROUP table<Player>
-updateRaidFrames = function(SORTED_RAID_GROUP)
+---@param SORTED_RAID_GROUPS table<number, table<Player>>
+updateRaidFrames = function(SORTED_RAID_GROUPS)
     -- We have to be 100% certain we won't be tainting
-    if InCombatLockdown() then 
+    if InCombatLockdown() then
         updateIsQued = true
-        return 
+        return
     end
     Print(PrintType.Debug, "updateRaidFrames - combined:", Cell.vars.currentLayoutTable["main"]["combineGroups"])
-    
+
     --[[ if useNameFilter then
         if CellPartyFrameHeader:GetAttribute("sortMethod") ~= "NAMELIST" then
             CellPartyFrameHeader:SetAttribute("groupingOrder", "")
@@ -332,21 +350,20 @@ updateRaidFrames = function(SORTED_RAID_GROUP)
         return
     end ]]
 
-    local header
-    if Cell.vars.currentLayoutTable["main"]["combineGroups"] then
-        header = _G["CellRaidFrameHeader0"]
-    else
-        header = _G["CellRaidFrameHeader"..playerSubGroup]
-    end
-    
-    for i = 1, #SORTED_RAID_GROUP do
-        ---@type Player
-        local player = SORTED_RAID_GROUP[i]
+    for subgroup, players in pairs(SORTED_RAID_GROUPS) do
+        -- get the proper header here
+        local header = _G["CellRaidFrameHeader" .. subgroup]
 
-        local b = header[i]
-        b:SetAttribute("unit", player.unit)
-        -- Update OmniCD namespace
-        _G[b:GetName()].unit = player.unit
+        -- iterate over the players in the subgroup
+        for i = 1, #players do
+            ---@type Player
+            local player = players[i]
+
+            local b = header[i]
+            b:SetAttribute("unit", player.unit)
+            -- Update OmniCD namespace
+            _G[b:GetName()].unit = player.unit
+        end
     end
 end
 
@@ -357,13 +374,16 @@ end
 ---@param playerB Player
 ---@return boolean|nil
 playerSort = function(playerA, playerB)
-    Print(PrintType.Debug, "playerSort")
-    if not playerA or not playerB then return nil end
-    if not playerA.name and not playerB.name then return nil end
+    if not playerA and not playerB then return nil end
+    local aName, bName = playerA["name"], playerB["name"]
+    if not aName and not bName then return nil end
 
-    if playerA.name == playerName then
+    if aName ~= playerName and bName ~= playerName then return nil end
+
+    --Print(PrintType.Debug, "playerSort", aName, "==>", bName)
+    if aName == playerName then
         return true
-    elseif playerB.name == playerName then
+    elseif bName == playerName then
         return false
     end
 
@@ -374,7 +394,7 @@ end
 ---@param playerB Player
 ---@return boolean|nil
 specSort = function(playerA, playerB)
-    Print(PrintType.Debug, "specSort")
+    --Print(PrintType.Debug, "specSort")
     if not playerA or not playerB then return nil end
 
     local aSpec, bSpec = playerA.specId, playerB.specId
@@ -384,7 +404,7 @@ specSort = function(playerA, playerB)
     local bPrio = INTERNAL_SPEC_PRIORITY[bSpec]
     if not aPrio and not bPrio then return nil end
 
-    Print(PrintType.Debug, aSpec, "(", aPrio, ") ", bSpec, "(", bPrio, ")")
+    --Print(PrintType.Debug,"spec", aSpec, "(", aPrio, ") ", bSpec, "(", bPrio, ")")
     return comparePriority(aPrio, bPrio)
 end
 
@@ -392,9 +412,9 @@ end
 ---@param playerB Player
 ---@return boolean|nil
 nameSort = function(playerA, playerB)
-    Print(PrintType.Debug, "nameSort")
+    --Print(PrintType.Debug, "nameSort")
     if not playerA or not playerB then return nil end
-    
+
     local aName, bName = playerA.name, playerB.name
     if not aName and not bName then return nil end
 
@@ -402,15 +422,15 @@ nameSort = function(playerA, playerB)
     local bPrio = INTERNAL_NAME_PRIORITY[bName]
     if not aPrio and not bPrio then return nil end
 
-    Print(PrintType.Debug, aName, "(", aPrio, ") ", bName, "(", bPrio, ")")
-    return comparePriority(aPrio, bPrio)   
+    --Print(PrintType.Debug, "name", aName, "(", aPrio, ") ", bName, "(", bPrio, ")")
+    return comparePriority(aPrio, bPrio)
 end
 
 ---@param playerA Player
 ---@param playerB Player
 ---@return boolean|nil
 roleSort = function(playerA, playerB)
-    Print(PrintType.Debug, "roleSort")
+    --Print(PrintType.Debug, "roleSort")
     if not playerA or not playerB then return nil end
 
     local aRole, bRole = playerA.role, playerB.role
@@ -420,7 +440,7 @@ roleSort = function(playerA, playerB)
     local bPrio = INTERNAL_ROLES_PRIORITY[bRole]
     if not aPrio and not bPrio then return nil end
 
-    Print(PrintType.Debug, aRole, "(", aPrio, ") ", bRole, "(", bPrio, ")")
+    --Print(PrintType.Debug, "role", aRole, "(", aPrio, ") ", bRole, "(", bPrio, ")")
     return comparePriority(aPrio, bPrio)
 end
 
@@ -428,7 +448,7 @@ end
 ---@param playerB Player
 ---@return boolean|nil
 specRoleSort = function(playerA, playerB)
-    Print(PrintType.Debug, "specRoleSort")
+    --Print(PrintType.Debug, "specRoleSort")
     if not playerA or not playerB then return nil end
 
     local aSpecRole, bSpecRole = playerA.specRole, playerB.specRole
@@ -438,7 +458,7 @@ specRoleSort = function(playerA, playerB)
     local bPrio = INTERNAL_SPECROLES_PRIORITY[bSpecRole]
     if not aPrio and not bPrio then return nil end
 
-    Print(PrintType.Debug, aSpecRole, "(", aPrio, ") ", bSpecRole, "(", bPrio, ")")
+    --Print(PrintType.Debug, "spec", aSpecRole, "(", aPrio, ") ", bSpecRole, "(", bPrio, ")")
     return comparePriority(aPrio, bPrio)
 end
 
@@ -446,7 +466,7 @@ end
 -------------------------------------------------------
 
 ---@param sortOption SortOption
----@return function SortFunction
+---@return function|nil SortFunction
 getSortFunction = function(sortOption)
     if sortOption == "PLAYER" then
         return playerSort
@@ -459,6 +479,8 @@ getSortFunction = function(sortOption)
     elseif sortOption == "SPECROLE" then
         return specRoleSort
     end
+
+    return nil
 end
 
 ---@param a number|nil
@@ -479,81 +501,96 @@ end
 --- Normalize the sort direction
 ---@param bool boolean
 ---@return boolean
-direction = function(bool) 
-    if INTERNAL_SORT_DIRECTION == "ASC" then 
-        return bool 
-    else 
-        return not bool  
+direction = function(bool)
+    if INTERNAL_SORT_DIRECTION == "ASC" then
+        return bool
+    else
+        return not bool
     end
 end
 
 -- MARK: Raid Info functions
 -------------------------------------------------------
 
----@param UNSORTED_RAID_GROUP table<Player>
----@return table<Player> SORTED_RAID_GROUP
-getSortedRaidGroup = function(UNSORTED_RAID_GROUP)
-    if not UNSORTED_RAID_GROUP then return end
-    
-    ---@type table<Player>
-    local SORTED_RAID_GROUP = debug and F:Copy(UNSORTED_RAID_GROUP) or UNSORTED_RAID_GROUP
+---@param UNSORTED_RAID_GROUPS table<number, table<Player>>
+---@return table<number, table<Player>>|nil SORTED_RAID_GROUPS
+getSortedRaidGroup = function(UNSORTED_RAID_GROUPS)
+    if not UNSORTED_RAID_GROUPS then return end
 
-    table.sort(SORTED_RAID_GROUP,
-    ---@param playerA Player
-    ---@param playerB Player
-    function(playerA, playerB)
-        local isValidData, maybeResult = isValidPlayers(playerA, playerB)
-        if not isValidData then
-            Print(PrintType.Debug, "invalid data ", maybeResult)
-            if maybeResult ~= nil then
-                return direction(maybeResult)
-            end
-            return direction(playerA.unit < playerB.unit)
+    for sub, players in pairs(UNSORTED_RAID_GROUPS) do
+        Print(PrintType.Debug, "sub: ", sub, #players)
+        if #players > 1 then
+            table.sort(players,
+                ---@param playerA Player
+                ---@param playerB Player
+                function(playerA, playerB)
+                    local isValidData = isValidPlayers(playerA, playerB)
+                    if not isValidData then
+                        Print(PrintType.Debug, "invalid data")
+                        --DevTool:AddData({ playerA, playerB }, "invalid data")
+                        return isValidData
+                    end
+
+                    for sortOption, sortFunction in pairs(INTERNAL_SORT_OPTIONS) do
+                        local maybeSortResult = sortFunction(playerA, playerB)
+                        if maybeSortResult ~= nil then
+                            Print(PrintType.Debug, "sort: ", playerA.name, "(", playerA.unit, ") ", playerB.name, "(",
+                                playerB.unit,
+                                ") ==>", sortOption)
+                            return direction(maybeSortResult)
+                        end
+                    end
+
+                    Print(PrintType.Debug, "sort: ", playerA.name, "(", playerA.unit, ") ", playerB.name, "(",
+                        playerB.unit,
+                        ") ==> fallback")
+                    return direction(playerA.unit < playerB.unit)
+                end)
         end
+    end
 
-        if debug then print("") end
-        Print(PrintType.Debug, "sort: ", playerA.name, "(", playerA.unit, ") ", playerB.name,"(", playerB.unit, ") ==>")
+    --DevAdd(SORTED_RAID_GROUPS, "SORTED_RAID_GROUPS")
 
-        for sortOption, sortFunction in pairs(INTERNAL_SORT_OPTIONS) do
-            local maybeResult = sortFunction(playerA, playerB)
-            if maybeResult ~= nil then
-                return direction(maybeResult)
-            end
-        end
-
-        Print(PrintType.Debug, "Fallback")
-        return direction(playerA.unit < playerB.unit)
-    end)
-
-    DevAdd(SORTED_RAID_GROUP, "SORTED_RAID_GROUP")
-
-    return SORTED_RAID_GROUP
+    return UNSORTED_RAID_GROUPS
 end
 
----@return table<Player> UNSORTED_RAID_GROUP
+---@return table<number, table<Player>> UNSORTED_RAID_GROUPS
 getRaidGroupInfo = function()
     Print(PrintType.Debug, "getRaidGroupInfo")
-    ---@type table<Player>
-    UNSORTED_RAID_GROUP = {}
+    ---@type table<number, table<Player>>
+    UNSORTED_RAID_GROUPS = {}
+
+    local groupFilter = Cell.vars.currentLayoutTable["groupFilter"]
 
     if Cell.vars.currentLayoutTable["main"]["combineGroups"] then
-        local groupFilter = Cell.vars.currentLayoutTable["groupFilter"]
-        for unit in F:IterateGroupMembers() do
-            local player = getPlayerInfo(unit)
+        UNSORTED_RAID_GROUPS[0] = {}
+
+        for i = 1, GetNumGroupMembers() do
+            local player = getPlayerInfo("raid" .. i)
+
             if groupFilter[player.subGroup] then
-                tinsert(UNSORTED_RAID_GROUP, player)
+                tinsert(UNSORTED_RAID_GROUPS[0], player)
             end
         end
     else
         playerSubGroup = select(2, F:GetRaidInfoByName(playerName))
-        for _, unit in pairs(F:GetUnitsInSubGroup(playerSubGroup)) do
-            local player = getPlayerInfo(unit)
-            tinsert(UNSORTED_RAID_GROUP, player)
+
+        for i = 1, GetNumGroupMembers() do
+            local player = getPlayerInfo("raid" .. i)
+
+            if groupFilter[player.subGroup] and ((not ONLY_SORT_MY_GROUP) or player.subGroup == playerSubGroup) then
+                if not UNSORTED_RAID_GROUPS[player.subGroup] then
+                    UNSORTED_RAID_GROUPS[player.subGroup] = {}
+                end
+
+                tinsert(UNSORTED_RAID_GROUPS[player.subGroup], player)
+            end
         end
     end
 
-    DevAdd(UNSORTED_RAID_GROUP, "UNSORTED_RAID_GROUP")
-    return UNSORTED_RAID_GROUP
+    --DevAdd(UNSORTED_RAID_GROUPS, "UNSORTED_RAID_GROUPS")
+
+    return UNSORTED_RAID_GROUPS
 end
 
 ---@param unit string
@@ -563,9 +600,10 @@ getPlayerInfo = function(unit)
 
     local raidIndex = tonumber(select(2, string.match(unit, "^(raid)(%d+)$")))
     ---@type CachedPlayerInfo
+    ---@diagnostic disable-next-line: undefined-field
     local cachedInfo = LGI:GetCachedInfo(guid)
-    if isValidPlayerInfo(cachedInfo) then 
-        DevAdd(cachedInfo, unit)
+    if isValidPlayerInfo(cachedInfo) then
+        --[[ DevAdd(cachedInfo, unit) ]]
         local subGroup = raidIndex and select(3, GetRaidRosterInfo(raidIndex)) or 1
 
         return {
@@ -581,7 +619,7 @@ getPlayerInfo = function(unit)
     else
         if not raidIndex then
             local name, realm = UnitName(unit)
-            Print(PrintType.Info, "Unable to find spec info for", (name or "n/a") .. "-" .. (realm or "n/a"))
+            Print(PrintType.Info, "1. Unable to find spec info for", (name or "n/a") .. "-" .. (realm or "n/a"), unit)
             return {
                 name = name,
                 realm = realm,
@@ -591,16 +629,17 @@ getPlayerInfo = function(unit)
             }
         end
 
-        local name, rank, subGroup, level, class, fileName, 
-                zone, online, isDead, role, isML, combatRole = GetRaidRosterInfo(raidIndex)
+        local nameAndRealm, rank, subGroup, level, class, fileName,
+        zone, online, isDead, role, isML, combatRole = GetRaidRosterInfo(raidIndex)
 
-        local name, realm = string.match(name, "([^%-]+)%-([^%-]+)")
+        local name, realm = string.match(nameAndRealm, "([^%-]+)%-([^%-]+)")
 
-        DevAdd({name, realm, rank, subGroup, level, class, fileName, zone, online, isDead, role, isML, combatRole}, unit)
-        
-        Print(PrintType.Info, "Unable to find spec info for", (name or "n/a") .. "-" .. (realm or "n/a"))
+        --[[ DevAdd({ name, realm, rank, subGroup, level, class, fileName, zone, online, isDead, role, isML, combatRole },
+            unit) ]]
+
+        Print(PrintType.Info, "2. Unable to find spec info for", (nameAndRealm or "n/a"), unit)
         return {
-            name = name,
+            name = name or nameAndRealm,
             realm = realm,
             unit = unit,
             guid = guid,
@@ -623,7 +662,7 @@ shouldSort = function()
         canelQueuedUpdate(true)
         return false
     end
-    if InCombatLockdown() then 
+    if InCombatLockdown() then
         canelQueuedUpdate()
         return false
     end
@@ -633,7 +672,7 @@ end
 
 handleQueuedUpdate = function()
     if not updateIsQued or not shouldSort() then return end
-    
+
     updateIsQued = false
     sortRaidFrames()
 end
@@ -643,7 +682,7 @@ addUpdateToQueue = function()
 
     -- Reset our queued update if we get new update requests
     -- eg. lots of new players joining or leaving
-    -- no need to keep sorting 
+    -- no need to keep sorting
     if updateIsQued and queuedUpdate then
         queuedUpdate:Cancel()
     end
@@ -652,38 +691,26 @@ addUpdateToQueue = function()
     queuedUpdate = C_Timer.NewTimer(QUE_TIMER, handleQueuedUpdate)
 end
 
---- Cancels queued update timer. fullReset will reset updateIsQued 
----@param fullReset boolean
+--- Cancels queued update timer. fullReset will reset updateIsQued
+---@param fullReset? boolean
 canelQueuedUpdate = function(fullReset)
     if fullReset then updateIsQued = false end
     if queuedUpdate then queuedUpdate:Cancel() end
 end
 
 --- Checks if two players are valid.
---- Will return maybeResult if either/both are nil
 ---@param aPlayer Player
 ---@param bPlayer Player
 ---@return boolean isValid
----@return boolean|nil? maybeResult
 isValidPlayers = function(aPlayer, bPlayer)
-    if not aPlayer and not bPlayer then 
-        Print(PrintType.Debug, "both nil")
-        return false, nil
-    elseif not aPlayer then
-        Print(PrintType.Debug, "aPlayer nil")
-        return false, false
-    elseif not bPlayer then
-        Print(PrintType.Debug, "bPlayer nil")
-        return false, true
-    end
-    return true
+    return aPlayer ~= nil and bPlayer ~= nil
 end
 
 ---@param info CachedPlayerInfo
 ---@return boolean
 isValidPlayerInfo = function(info)
-    return info and info.specId and info.specRole 
-            and info.role and info.name and info.realm
+    return (info and info.specId and info.specRole
+        and info.role and info.name and info.realm) == true
 end
 
 -- MARK: Events
@@ -712,12 +739,14 @@ Print = function(type, ...)
     if type == PrintType.Debug then
         if not debug then return end
         print("|cFF7CFC00[RaidSortOptions]|r Debug:", ...)
-    elseif type == PrintType.Error and showErrorMessages then
+    elseif type == PrintType.Error then
+        if not showErrorMessages then return end
         print("|cFFFF3030[RaidSortOptions]|r Error:", ...)
-    elseif type == PrintType.Info and showInfoMessages then
+    elseif type == PrintType.Info then
+        if not showInfoMessages then return end
         print("|cffbbbbbb[RaidSortOptions]|r Info:", ...)
     else
-        print("|cffff7777[RaidSortOptions]|r", type, ... )
+        print("|cffff7777[RaidSortOptions]|r", type, ...)
     end
 end
 DevAdd = function(data, name) if debug and DevTool then DevTool:AddData(data, name) end end
@@ -726,12 +755,12 @@ DevAdd = function(data, name) if debug and DevTool then DevTool:AddData(data, na
 -------------------------------------------------------
 SLASH_CELLRAIDSORT1 = "/rsort"
 function SlashCmdList.CELLRAIDSORT()
-    sortRaidFrames()
     if InCombatLockdown() then
         Print("Sort queued till after combat")
     else
         Print("Sorting")
     end
+    sortRaidFrames()
 end
 
 SLASH_CELLRAIDSORTUPDATE1 = "/rupdate"
@@ -744,20 +773,20 @@ end
 -------------------------------------------------------
 
 ---@class CachedPlayerInfo
----@field assignedRole string 
----@field class string 
----@field faction string 
----@field gender string 
----@field inspected boolean 
----@field level number 
----@field name string 
----@field race string 
----@field realm string 
----@field role string 
----@field specIcon number 
----@field specId number 
----@field specName string 
----@field specRole string 
+---@field assignedRole string
+---@field class string
+---@field faction string
+---@field gender string
+---@field inspected boolean
+---@field level number
+---@field name string
+---@field race string
+---@field realm string
+---@field role string
+---@field specIcon number
+---@field specId number
+---@field specName string
+---@field specRole string
 ---@field unit string
 
 ---@class Player
@@ -770,7 +799,7 @@ end
 ---@field role string
 ---@field specRole string
 
----@alias SortOption 
+---@alias SortOption
 ---| "PLAYER"
 ---| "SPEC"
 ---| "NAME"
