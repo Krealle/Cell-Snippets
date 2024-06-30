@@ -121,7 +121,7 @@ local SPEC_PRIORITY = {
 
 -- This will maintain strict group order on roster changes in combat
 -- but will not show new group members until combat ends.
-local USE_NAME_FILTER = true
+local USE_NAME_FILTER = false
 
 ---------------------------------------------------------------------------
 -- WIP: The ones below don't actually do anything yet
