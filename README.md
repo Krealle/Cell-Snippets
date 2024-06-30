@@ -133,6 +133,16 @@ local SPEC_PRIORITY = {
 }
 ```
 
+#### Name Filter
+
+Set this to `true` to use a strict filter for groups. This will minimize group player shuffling when sorting, and disables sorting during combat.
+
+**NOTE:** New players joining the raid will **not** be shown on the frames until after combat.
+
+```
+local USE_NAME_FILTER = true
+```
+
 #### Utility options
 
 Set these to `false` to suppress error/info messages during sorting.
