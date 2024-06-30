@@ -119,6 +119,10 @@ local SPEC_PRIORITY = {
     1473, -- Evoker - Augmentation
 }
 
+-- This will maintain strict group order on roster changes in combat
+-- but will not show new group members until combat ends.
+local USE_NAME_FILTER = true
+
 ---------------------------------------------------------------------------
 -- WIP: The ones below don't actually do anything yet
 
@@ -134,12 +138,6 @@ local SPEC_PRIORITY = {
 -- Valid range: 1-5
 -- local fixedPlayerIndex = 1
 -- local useFixedPlayedIndex = false
-
--- This will maintain strict group order on roster changes in combat
--- but will not show new group members until combat ends.
--- Recommend to keep it off unless you expect a lot of changes in combat
--- without the players in the group changing
--- local useNameFilter = false
 
 -- Toggle whether to sort only your group
 -- local onlySortMyGroup = true
@@ -283,6 +281,10 @@ sanitizeSortOptions = function()
         Print(PrintType.Info, "Invalid ONLY_SORT_MY_GROUP - forced to false")
         ONLY_SORT_MY_GROUP = false
     end
+    if type(USE_NAME_FILTER) ~= "boolean" then
+        Print(PrintType.Info, "Invalid USE_NAME_FILTER - forced to false")
+        USE_NAME_FILTER = false
+    end
 
     --[[ DevAdd({ INTERNAL_SORT_OPTIONS,
             INTERNAL_SPEC_PRIORITY,
@@ -334,25 +336,18 @@ updateRaidFrames = function(SORTED_RAID_GROUPS)
     end
     Print(PrintType.Debug, "updateRaidFrames - combined:", Cell.vars.currentLayoutTable["main"]["combineGroups"])
 
-    --[[ if useNameFilter then
-        if CellPartyFrameHeader:GetAttribute("sortMethod") ~= "NAMELIST" then
-            CellPartyFrameHeader:SetAttribute("groupingOrder", "")
-            CellPartyFrameHeader:SetAttribute("groupBy", nil)
-            CellPartyFrameHeader:SetAttribute("sortMethod", "NAMELIST")
-        end
-
-        CellPartyFrameHeader:SetAttribute("nameList", F:TableToString(nameList, ","))
-
-        -- update OmniCD namespace
-        for i = 1, 5 do
-            CellPartyFrameHeader:UpdateButtonUnit(CellPartyFrameHeader[i]:GetName(), CellPartyFrameHeader[i]:GetAttribute("unit"))
-        end
-        return
-    end ]]
-
     for subgroup, players in pairs(SORTED_RAID_GROUPS) do
         -- get the proper header here
         local header = _G["CellRaidFrameHeader" .. subgroup]
+
+        local nameList = {}
+        if USE_NAME_FILTER and header:GetAttribute("sortMethod") ~= "NAMELIST" then
+            Print(PrintType.Debug, "updateRaidFrames - setting sortMethod to NAMELIST")
+            header:SetAttribute("groupingOrder", "")
+            header:SetAttribute("groupBy", nil)
+            header:SetAttribute("groupFilter", nil)
+            header:SetAttribute("sortMethod", "NAMELIST")
+        end
 
         -- iterate over the players in the subgroup
         for i = 1, #players do
@@ -360,9 +355,21 @@ updateRaidFrames = function(SORTED_RAID_GROUPS)
             local player = players[i]
 
             local b = header[i]
-            b:SetAttribute("unit", player.unit)
+            if USE_NAME_FILTER then
+                local playerNameWithRealm = player.name
+                if player.realm then
+                    playerNameWithRealm = playerNameWithRealm .. "-" .. player.realm
+                end
+                tinsert(nameList, playerNameWithRealm)
+            else
+                b:SetAttribute("unit", player.unit)
+            end
             -- Update OmniCD namespace
             _G[b:GetName()].unit = player.unit
+        end
+
+        if USE_NAME_FILTER then
+            header:SetAttribute("nameList", F:TableToString(nameList, ","))
         end
     end
 end
