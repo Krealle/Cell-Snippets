@@ -1,6 +1,6 @@
 -- More options for party sorting
 
--- IMPORTANT: 
+-- IMPORTANT:
 -- If "Sort By Role" is enabled groups will only be sorted if you are playing DPS
 --
 -- Due to how SecureFrames are handled in combat, and the implementation
@@ -10,7 +10,7 @@
 ---------------------------------------------------------------------------
 -- SET YOUR OPTIONS HERE
 
--- This will maintain strict group order on roster changes in combat 
+-- This will maintain strict group order on roster changes in combat
 -- but will not show new group members until combat ends.
 -- Recommend to keep it off unless you expect a lot of changes in combat
 -- without the players in the group changing
@@ -18,20 +18,22 @@ local useNameFilter = false
 
 -- Used for index sorting
 -- Valid range: 1-5
-local fixedPlayerIndex = 1 
+local fixedPlayerIndex = 1
 
 -- Used for damager role sorting
 -- Valid range: 1-3
 local fixedPlayerDamagerIndex = 1
+
+local onlySortWhenDamager = false
 ---------------------------------------------------------------------------
 -- WIP: The ones below don't actually do anything yet
 
 -- Add option to dictate priority based on names
-local priorityList = {"Xephyris"}
+local priorityList = { "Xephyris" }
 local usePriorityList = false
 
 -- Add option to dictate a fixed order
-local fixedList = {"player1","player2","player3","player4","player5"}
+local fixedList = { "player1", "player2", "player3", "player4", "player5" }
 local useFixedList = false
 ---------------------------------------------------------------------------
 -- END OF OPTIONS
@@ -39,13 +41,21 @@ local useFixedList = false
 
 -- MARK: Sanitize user input
 ---------------------------------------------------------------------------
-if type(fixedPlayerIndex) ~= "number" then fixedPlayerIndex = 1  
-elseif fixedPlayerIndex > 5 then fixedPlayerIndex = 5 
-elseif fixedPlayerIndex < 1 then fixedPlayerIndex = 1 end
+if type(fixedPlayerIndex) ~= "number" then
+    fixedPlayerIndex = 1
+elseif fixedPlayerIndex > 5 then
+    fixedPlayerIndex = 5
+elseif fixedPlayerIndex < 1 then
+    fixedPlayerIndex = 1
+end
 
-if type(fixedPlayerDamagerIndex) ~= "number" then fixedPlayerDamagerIndex = 1 
-elseif fixedPlayerDamagerIndex > 3 then fixedPlayerDamagerIndex = 3 
-elseif fixedPlayerDamagerIndex < 1 then fixedPlayerDamagerIndex = 1 end
+if type(fixedPlayerDamagerIndex) ~= "number" then
+    fixedPlayerDamagerIndex = 1
+elseif fixedPlayerDamagerIndex > 3 then
+    fixedPlayerDamagerIndex = 3
+elseif fixedPlayerDamagerIndex < 1 then
+    fixedPlayerDamagerIndex = 1
+end
 ---------------------------------------------------------------------------
 
 -- MARK: Variables
@@ -56,28 +66,28 @@ local shouldSort, indexSort, roleSort, sortPartyFrames, PartyFrame_UpdateLayout,
 local Print, DevAdd
 -- Vars
 local playerName = GetUnitName("player")
-local debug = false
+local debug = true
 local queuedUpdate
 
 -- MARK: Sorting functions
 -------------------------------------------------------
 ---@param layout string
----@param which string
+---@param which string|nil
 sortPartyFrames = function(layout, which)
-    if Cell.vars.groupType ~= "party" then 
+    if Cell.vars.groupType ~= "party" then
         queuedUpdate = false
-        return 
+        return
     end
-    if InCombatLockdown() then 
+    if InCombatLockdown() then
         queuedUpdate = true
-        return 
+        return
     end
 
     Print("sortPartyFrames - layout:" .. (layout or "") .. " which:" .. (which or ""))
     if (which and which ~= "sort") then return end
 
     layout = CellDB["layouts"][layout]
-    
+
     if not shouldSort(layout) then return end
 
     local nameList
@@ -173,18 +183,19 @@ end
 ---@return boolean
 shouldSort = function(layout)
     local playerRole = UnitGroupRolesAssigned("player")
-    Print("shouldSort - playerRole:" .. playerRole .. " sortByRole:" .. (layout["main"]["sortByRole"] and "true" or "false"))
+    Print("shouldSort - playerRole:" ..
+        playerRole .. " sortByRole:" .. (layout["main"]["sortByRole"] and "true" or "false"))
     return (layout["main"]["sortByRole"] and playerRole == "DAMAGER")
-            or (not layout["main"]["sortByRole"]) and playerRole ~= "NONE"
+        or (not layout["main"]["sortByRole"]) and playerRole ~= "NONE"
 end
 
 ---@param nameList table<string>
 updateAttributes = function(nameList)
-    if InCombatLockdown() then 
+    if InCombatLockdown() then
         queuedUpdate = true
-        return 
+        return
     end
-    
+
     if useNameFilter then
         if CellPartyFrameHeader:GetAttribute("sortMethod") ~= "NAMELIST" then
             CellPartyFrameHeader:SetAttribute("groupingOrder", "")
@@ -196,13 +207,14 @@ updateAttributes = function(nameList)
 
         -- update OmniCD namespace
         for i = 1, 5 do
-            CellPartyFrameHeader:UpdateButtonUnit(CellPartyFrameHeader[i]:GetName(), CellPartyFrameHeader[i]:GetAttribute("unit"))
+            CellPartyFrameHeader:UpdateButtonUnit(CellPartyFrameHeader[i]:GetName(),
+                CellPartyFrameHeader[i]:GetAttribute("unit"))
         end
         return
     end
 
     for i = 1, 5 do
-        local unit = nameList[i] or "party"..i
+        local unit = nameList[i] or ("party" .. i)
         CellPartyFrameHeader[i]:SetAttribute("unit", unit)
         -- update OmniCD namespace
         CellPartyFrameHeader:UpdateButtonUnit(CellPartyFrameHeader[i]:GetName(), unit)
@@ -212,7 +224,7 @@ end
 ---@param isInitial boolean
 handleQueuedUpdate = function(isInitial)
     if not queuedUpdate then return end
-    
+
     queuedUpdate = false
     sortPartyFrames(Cell.vars.currentLayout)
 end
@@ -228,7 +240,7 @@ eventFrame:SetScript("OnEvent", function(self, event)
         return
     end
 
-    sortPartyFrames(Cell.vars.currentLayout) 
+    sortPartyFrames(Cell.vars.currentLayout)
 end)
 
 -- MARK: Callback
@@ -252,8 +264,11 @@ end
 
 -- MARK: Debug
 -------------------------------------------------------
-Print = function(msg, isErr) 
-    if isErr then F:Print("PartySortOptions: |cFFFF3030" .. msg .. "|r")
-    elseif debug then F:Print("PartySortOptions: " .. msg) end
+Print = function(msg, isErr)
+    if isErr then
+        F:Print("PartySortOptions: |cFFFF3030" .. msg .. "|r")
+    elseif debug then
+        F:Print("PartySortOptions: " .. msg)
+    end
 end
 DevAdd = function(data, name) if debug and DevTool then DevTool:AddData(data, name) end end
