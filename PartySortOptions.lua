@@ -55,7 +55,6 @@ local F = Cell.funcs
 local shouldSort, indexSort, roleSort, sortPartyFrames, PartyFrame_UpdateLayout, handleQueuedUpdate, updateAttributes
 local Print, DevAdd
 -- Vars
-local nameList = {}
 local playerName = GetUnitName("player")
 local debug = false
 local queuedUpdate
