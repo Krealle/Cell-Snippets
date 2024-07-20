@@ -18,11 +18,15 @@ local useNameFilter = false
 
 -- Used for index sorting
 -- Valid range: 1-5
-local fixedPlayerIndex = 1
+local FIXED_PLAYER_INDEX = 1
 
--- Used for damager role sorting
--- Valid range: 1-3
-local fixedPlayerDamagerIndex = 1
+-- Used for role sorting
+-- Valid range: 1-5
+local FIXED_PLAYER_ROLE_INDEX = 1
+
+-- Whether to to use fixed player index
+-- Set to true to use strict index when sorting by role
+local USE_FIXED_INDEX = false
 
 local onlySortWhenDamager = false
 ---------------------------------------------------------------------------
@@ -41,20 +45,28 @@ local useFixedList = false
 
 -- MARK: Sanitize user input
 ---------------------------------------------------------------------------
-if type(fixedPlayerIndex) ~= "number" then
-    fixedPlayerIndex = 1
-elseif fixedPlayerIndex > 5 then
-    fixedPlayerIndex = 5
-elseif fixedPlayerIndex < 1 then
-    fixedPlayerIndex = 1
+if type(FIXED_PLAYER_INDEX) ~= "number" then
+    FIXED_PLAYER_INDEX = 1
+elseif FIXED_PLAYER_INDEX > 5 then
+    FIXED_PLAYER_INDEX = 5
+elseif FIXED_PLAYER_INDEX < 1 then
+    FIXED_PLAYER_INDEX = 1
 end
 
-if type(fixedPlayerDamagerIndex) ~= "number" then
-    fixedPlayerDamagerIndex = 1
-elseif fixedPlayerDamagerIndex > 3 then
-    fixedPlayerDamagerIndex = 3
-elseif fixedPlayerDamagerIndex < 1 then
-    fixedPlayerDamagerIndex = 1
+if type(FIXED_PLAYER_ROLE_INDEX) ~= "number" then
+    FIXED_PLAYER_ROLE_INDEX = 1
+elseif FIXED_PLAYER_ROLE_INDEX > 5 then
+    FIXED_PLAYER_ROLE_INDEX = 5
+elseif FIXED_PLAYER_ROLE_INDEX < 1 then
+    FIXED_PLAYER_ROLE_INDEX = 1
+end
+
+if type(USE_FIXED_INDEX) ~= "boolean" then
+    USE_FIXED_INDEX = false
+end
+
+if type(onlySortWhenDamager) ~= "boolean" then
+    onlySortWhenDamager = false
 end
 ---------------------------------------------------------------------------
 
@@ -62,7 +74,7 @@ end
 ---------------------------------------------------------------------------
 -- Functions
 local F = Cell.funcs
-local shouldSort, indexSort, roleSort, sortPartyFrames, PartyFrame_UpdateLayout, handleQueuedUpdate, updateAttributes
+local shouldSort, PartyFrame_UpdateLayout, handleQueuedUpdate, updateAttributes
 local Print, DevAdd
 -- Vars
 local playerName = GetUnitName("player")
@@ -71,68 +83,10 @@ local queuedUpdate
 
 -- MARK: Sorting functions
 -------------------------------------------------------
----@param layout string
----@param which string|nil
-sortPartyFrames = function(layout, which)
-    if Cell.vars.groupType ~= "party" then
-        queuedUpdate = false
-        return
-    end
-    if InCombatLockdown() then
-        queuedUpdate = true
-        return
-    end
 
-    Print("sortPartyFrames - layout:" .. (layout or "") .. " which:" .. (which or ""))
-    if (which and which ~= "sort") then return end
-
-    layout = CellDB["layouts"][layout]
-
-    if not shouldSort(layout) then return end
-
-    local nameList
-    if layout["main"]["sortByRole"] then
-        Print("sortPartyFrames - Sorting by role.")
-        nameList = roleSort(layout)
-    else
-        Print("sortPartyFrames - Sorting by index.")
-        nameList = indexSort()
-    end
-
-    if not nameList then
-        Print("Found no players in party.", true)
-        return
-    end
-
-    updateAttributes(nameList)
-end
-
+---@param roleOrder table<number, "DAMAGER" | "TANK" | "HEALER">
 ---@return table<string>|false
-indexSort = function()
-    local units = {}
-    for unit in F:IterateGroupMembers() do
-        local name = GetUnitName(unit, true)
-
-        if unit ~= "player" and name ~= playerName then
-            local unitToUse = useNameFilter and name or unit
-            tinsert(units, unitToUse)
-        end
-    end
-
-    -- Prevent nil entries
-    local index = math.min(fixedPlayerIndex, #units + 1)
-    local player = useNameFilter and playerName or "player"
-    tinsert(units, index, player)
-
-    DevAdd(units, "indexSort units")
-    if #units == 0 then return false end
-
-    return units
-end
-
----@param layout string
----@return table<string>|false
-roleSort = function(layout)
+local function roleSort(roleOrder)
     local roleUnits = {
         ["TANK"] = {},
         ["HEALER"] = {},
@@ -142,20 +96,28 @@ roleSort = function(layout)
 
     for unit in F:IterateGroupMembers() do
         local name = GetUnitName(unit, true)
+
         if unit ~= "player" and name ~= playerName then
             local unitToUse = useNameFilter and name or unit
-            tinsert(roleUnits[UnitGroupRolesAssigned(unit)], unitToUse)
+            local role = UnitGroupRolesAssigned(unit)
+
+            tinsert(roleUnits[role], unitToUse)
         end
     end
 
-    -- Prevent nil entries
-    local index = math.min(fixedPlayerDamagerIndex, #roleUnits["DAMAGER"] + 1)
     local player = useNameFilter and playerName or "player"
-    tinsert(roleUnits["DAMAGER"], index, player)
+
+    -- When not using fixed index insert player into their respective role
+    if not USE_FIXED_INDEX then
+        local playerRole = UnitGroupRolesAssigned("player")
+        local index = math.min(FIXED_PLAYER_ROLE_INDEX, #roleUnits[playerRole] + 1)
+
+        tinsert(roleUnits[playerRole], index, player)
+    end
 
     DevAdd(roleUnits, "roleSort")
     local units = {}
-    for _, role in pairs(Cell.vars.currentLayoutTable["main"]["roleOrder"]) do
+    for _, role in pairs(roleOrder) do
         if roleUnits[role] then
             for _, unit in pairs(roleUnits[role]) do
                 tinsert(units, unit)
@@ -171,22 +133,84 @@ roleSort = function(layout)
         end
     end
 
+    -- When using fixed index insert player after all other units
+    if USE_FIXED_INDEX then
+        local index = math.min(FIXED_PLAYER_INDEX, #units + 1)
+        tinsert(units, index, player)
+    end
+
     DevAdd(units, "roleSort units")
     if #units == 0 then return false end
 
     return units
 end
 
+---@return table<string>|false
+local function indexSort()
+    local units = {}
+    for unit in F:IterateGroupMembers() do
+        local name = GetUnitName(unit, true)
+
+        if unit ~= "player" and name ~= playerName then
+            local unitToUse = useNameFilter and name or unit
+            tinsert(units, unitToUse)
+        end
+    end
+
+    -- Prevent nil entries
+    local index = math.min(FIXED_PLAYER_INDEX, #units + 1)
+    local player = useNameFilter and playerName or "player"
+    tinsert(units, index, player)
+
+    DevAdd(units, "indexSort units")
+    if #units == 0 then return false end
+
+    return units
+end
+
+local function sortPartyFrames()
+    if not shouldSort() then return end
+
+    local layout = Cell.vars.currentLayoutTable
+
+    local nameList
+    if layout["main"]["sortByRole"] then
+        Print("sortPartyFrames - Sorting by role.")
+        nameList = roleSort(layout["main"]["roleOrder"])
+    else
+        Print("sortPartyFrames - Sorting by index.")
+        nameList = indexSort()
+    end
+
+    if not nameList then
+        Print("Found no players in party.", true)
+        return
+    end
+
+    updateAttributes(nameList)
+end
+
 -- MARK: Helper functions
 -------------------------------------------------------
----@param layout string
+
 ---@return boolean
-shouldSort = function(layout)
+shouldSort = function()
+    if Cell.vars.groupType ~= "party" then
+        queuedUpdate = false
+        return false
+    end
+    if InCombatLockdown() then
+        queuedUpdate = true
+        return false
+    end
+
     local playerRole = UnitGroupRolesAssigned("player")
-    Print("shouldSort - playerRole:" ..
-        playerRole .. " sortByRole:" .. (layout["main"]["sortByRole"] and "true" or "false"))
-    return (layout["main"]["sortByRole"] and playerRole == "DAMAGER")
-        or (not layout["main"]["sortByRole"]) and playerRole ~= "NONE"
+    if onlySortWhenDamager and playerRole ~= "DAMAGER" then
+        queuedUpdate = false
+        return false
+    end
+
+    return true
 end
 
 ---@param nameList table<string>
@@ -210,6 +234,7 @@ updateAttributes = function(nameList)
             CellPartyFrameHeader:UpdateButtonUnit(CellPartyFrameHeader[i]:GetName(),
                 CellPartyFrameHeader[i]:GetAttribute("unit"))
         end
+
         return
     end
 
@@ -221,12 +246,11 @@ updateAttributes = function(nameList)
     end
 end
 
----@param isInitial boolean
-handleQueuedUpdate = function(isInitial)
-    if not queuedUpdate then return end
+handleQueuedUpdate = function()
+    if not queuedUpdate or not shouldSort() then return end
 
     queuedUpdate = false
-    sortPartyFrames(Cell.vars.currentLayout)
+    sortPartyFrames()
 end
 
 -- MARK: Events
@@ -236,21 +260,20 @@ eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
 eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 eventFrame:SetScript("OnEvent", function(self, event)
     if event == "PLAYER_REGEN_ENABLED" then
-        handleQueuedUpdate(true)
+        handleQueuedUpdate()
         return
     end
 
-    sortPartyFrames(Cell.vars.currentLayout)
+    sortPartyFrames()
 end)
 
 -- MARK: Callback
 -------------------------------------------------------
----@param layout string
----@param which string
-PartyFrame_UpdateLayout = function(layout, which)
+
+PartyFrame_UpdateLayout = function()
     -- Update layout after 0.5 seconds
     -- Need to make sure that the default function is resolved
-    C_Timer.After(0.5, function() sortPartyFrames(layout, which) end)
+    C_Timer.After(0.5, function() sortPartyFrames() end)
 end
 Cell:RegisterCallback("UpdateLayout", "PartySortOptions_UpdateLayout", PartyFrame_UpdateLayout)
 
@@ -258,7 +281,7 @@ Cell:RegisterCallback("UpdateLayout", "PartySortOptions_UpdateLayout", PartyFram
 -------------------------------------------------------
 SLASH_CELLPARTYSORT1 = "/psort"
 function SlashCmdList.CELLPARTYSORT()
-    sortPartyFrames(Cell.vars.currentLayout, "sort")
+    sortPartyFrames()
     F:Print("sorted")
 end
 
