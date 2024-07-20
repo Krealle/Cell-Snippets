@@ -78,7 +78,7 @@ local shouldSort, PartyFrame_UpdateLayout, handleQueuedUpdate, updateAttributes
 local Print, DevAdd
 -- Vars
 local playerName = GetUnitName("player")
-local debug = true
+local debug = false
 local queuedUpdate
 
 -- MARK: Sorting functions
