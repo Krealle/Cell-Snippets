@@ -6,6 +6,7 @@
     ".vscode",
   ],
   "Lua.diagnostics.globals": [
+    "GameTooltip_SetDefaultAnchor",
     "RGBToColorCode",
     "DEFAULT_CHAT_FRAME",
     "SlashCmdList",
@@ -77,6 +78,8 @@
     "STAT_VERSATILITY",
     "STAT_MASTERY",
     "DevTool",
-    "Cell"
+    "Cell",
+    "CellDB",
+    "CellPartyFrameHeader"
   ],
 }
