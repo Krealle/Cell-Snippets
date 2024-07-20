@@ -74,12 +74,14 @@ end
 ---------------------------------------------------------------------------
 -- Functions
 local F = Cell.funcs
-local shouldSort, PartyFrame_UpdateLayout, handleQueuedUpdate, updateAttributes
+local shouldSort, handleQueuedUpdate, addUpdateToQueue, canelQueuedUpdate
+local PartyFrame_UpdateLayout, updateAttributes
 local Print, DevAdd
 -- Vars
 local playerName = GetUnitName("player")
 local debug = false
-local queuedUpdate
+local updateIsQued, queuedUpdate
+local init = true
 
 -- MARK: Sorting functions
 -------------------------------------------------------
@@ -170,6 +172,13 @@ end
 
 local function sortPartyFrames()
     if not shouldSort() then return end
+    -- We delay initial update to not affect loading time
+    -- Inital call is from "UpdateLayout" fire
+    if init then
+        init = false
+        addUpdateToQueue()
+        return
+    end
 
     local layout = Cell.vars.currentLayoutTable
 
@@ -196,21 +205,49 @@ end
 ---@return boolean
 shouldSort = function()
     if Cell.vars.groupType ~= "party" then
-        queuedUpdate = false
+        canelQueuedUpdate(true)
         return false
     end
     if InCombatLockdown() then
-        queuedUpdate = true
+        canelQueuedUpdate()
         return false
     end
 
     local playerRole = UnitGroupRolesAssigned("player")
     if onlySortWhenDamager and playerRole ~= "DAMAGER" then
-        queuedUpdate = false
+        canelQueuedUpdate(true)
         return false
     end
 
     return true
+end
+
+handleQueuedUpdate = function()
+    if not updateIsQued or not shouldSort() then return end
+
+    updateIsQued = false
+    sortPartyFrames()
+end
+
+addUpdateToQueue = function()
+    if not shouldSort() then return end
+
+    -- Reset our queued update if we get new update requests
+    -- eg. lots of new players joining or leaving
+    -- no need to keep sorting
+    if updateIsQued and queuedUpdate then
+        queuedUpdate:Cancel()
+    end
+
+    updateIsQued = true
+    queuedUpdate = C_Timer.NewTimer(1, handleQueuedUpdate)
+end
+
+--- Cancels queued update timer. fullReset will reset updateIsQued
+---@param fullReset? boolean
+canelQueuedUpdate = function(fullReset)
+    if fullReset then updateIsQued = false end
+    if queuedUpdate then queuedUpdate:Cancel() end
 end
 
 ---@param nameList table<string>
@@ -222,8 +259,10 @@ updateAttributes = function(nameList)
 
     if useNameFilter then
         if CellPartyFrameHeader:GetAttribute("sortMethod") ~= "NAMELIST" then
+            Print("Setting sortMethod to NAMELIST")
             CellPartyFrameHeader:SetAttribute("groupingOrder", "")
             CellPartyFrameHeader:SetAttribute("groupBy", nil)
+            CellPartyFrameHeader:SetAttribute("groupFilter", nil)
             CellPartyFrameHeader:SetAttribute("sortMethod", "NAMELIST")
         end
 
@@ -246,13 +285,6 @@ updateAttributes = function(nameList)
     end
 end
 
-handleQueuedUpdate = function()
-    if not queuedUpdate or not shouldSort() then return end
-
-    queuedUpdate = false
-    sortPartyFrames()
-end
-
 -- MARK: Events
 -------------------------------------------------------
 local eventFrame = CreateFrame("Frame")
@@ -264,16 +296,14 @@ eventFrame:SetScript("OnEvent", function(self, event)
         return
     end
 
-    sortPartyFrames()
+    addUpdateToQueue()
 end)
 
 -- MARK: Callback
 -------------------------------------------------------
 
 PartyFrame_UpdateLayout = function()
-    -- Update layout after 0.5 seconds
-    -- Need to make sure that the default function is resolved
-    C_Timer.After(0.5, function() sortPartyFrames() end)
+    addUpdateToQueue()
 end
 Cell:RegisterCallback("UpdateLayout", "PartySortOptions_UpdateLayout", PartyFrame_UpdateLayout)
 
