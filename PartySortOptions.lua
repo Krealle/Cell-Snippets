@@ -262,7 +262,6 @@ updateAttributes = function(nameList)
             Print("Setting sortMethod to NAMELIST")
             CellPartyFrameHeader:SetAttribute("groupingOrder", "")
             CellPartyFrameHeader:SetAttribute("groupBy", nil)
-            CellPartyFrameHeader:SetAttribute("groupFilter", nil)
             CellPartyFrameHeader:SetAttribute("sortMethod", "NAMELIST")
         end
 
@@ -311,8 +310,8 @@ Cell:RegisterCallback("UpdateLayout", "PartySortOptions_UpdateLayout", PartyFram
 -------------------------------------------------------
 SLASH_CELLPARTYSORT1 = "/psort"
 function SlashCmdList.CELLPARTYSORT()
-    sortPartyFrames()
-    F:Print("sorted")
+    Cell:Fire("UpdateLayout", Cell.vars.currentLayout, "sort")
+    F:Print("PartySortOptions: Sorting")
 end
 
 -- MARK: Debug
