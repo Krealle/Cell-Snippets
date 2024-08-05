@@ -330,7 +330,10 @@ end
 ---@param SORTED_RAID_GROUPS table<number, table<Player>>
 updateRaidFrames = function(SORTED_RAID_GROUPS)
     -- We have to be 100% certain we won't be tainting
-    if not shouldSort() then return end
+    if InCombatLockdown() then
+        addUpdateToQueue()
+        return
+    end
     Print(PrintType.Debug, "updateRaidFrames - combined:", Cell.vars.currentLayoutTable["main"]["combineGroups"])
 
     for subgroup, players in pairs(SORTED_RAID_GROUPS) do
@@ -695,16 +698,17 @@ handleQueuedUpdate = function()
 end
 
 addUpdateToQueue = function()
+    updateIsQued = true
+
     if not shouldSort() then return end
 
     -- Reset our queued update if we get new update requests
     -- eg. lots of new players joining or leaving
     -- no need to keep sorting
-    if updateIsQued and queuedUpdate then
+    if queuedUpdate then
         queuedUpdate:Cancel()
     end
 
-    updateIsQued = true
     queuedUpdate = C_Timer.NewTimer(QUE_TIMER, handleQueuedUpdate)
 end
 
