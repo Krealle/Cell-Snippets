@@ -158,7 +158,7 @@ local playerSort, specSort, nameSort, roleSort, specRoleSort
 -- Sort Helpers
 local getSortFunction, comparePriority, direction
 -- Raid Info
-local getSortedRaidGroup, getRaidGroupInfo, getPlayerInfo, getUnits
+local getSortedRaidGroup, getRaidGroupInfo, getPlayerInfo, getUnits, typeOneMissing, typeTwoMissing
 -- Helpers
 local shouldSort, handleQueuedUpdate, addUpdateToQueue, canelQueuedUpdate
 local isValidPlayers, isValidPlayerInfo
@@ -569,6 +569,9 @@ getRaidGroupInfo = function()
 
     local groupFilter = Cell.vars.currentLayoutTable["groupFilter"]
 
+    typeOneMissing = {}
+    typeTwoMissing = {}
+
     if Cell.vars.currentLayoutTable["main"]["combineGroups"] then
         UNSORTED_RAID_GROUPS[0] = {}
 
@@ -593,6 +596,13 @@ getRaidGroupInfo = function()
                 tinsert(UNSORTED_RAID_GROUPS[player.subGroup], player)
             end
         end
+    end
+
+    if #typeOneMissing > 0 then
+        Print(PrintType.Info, "Unable to find spec info(1) for:", F:TableToString(typeOneMissing, ", "))
+    end
+    if #typeTwoMissing > 0 then
+        Print(PrintType.Info, "Unable to find spec info(1) for:", F:TableToString(typeTwoMissing, ", "))
     end
 
     --DevAdd(UNSORTED_RAID_GROUPS, "UNSORTED_RAID_GROUPS")
@@ -626,7 +636,8 @@ getPlayerInfo = function(unit)
     else
         if not raidIndex then
             local name, realm = UnitName(unit)
-            Print(PrintType.Info, "1. Unable to find spec info for", (name or "n/a") .. "-" .. (realm or "n/a"), unit)
+            table.insert(typeOneMissing, { ((name or "n/a") .. "-" .. (realm or "n/a") .. "[" .. unit .. "]") })
+            --Print(PrintType.Info, "1. Unable to find spec info for", (name or "n/a") .. "-" .. (realm or "n/a"), unit)
             return {
                 name = name,
                 realm = realm,
@@ -644,7 +655,8 @@ getPlayerInfo = function(unit)
         --[[ DevAdd({ name, realm, rank, subGroup, level, class, fileName, zone, online, isDead, role, isML, combatRole },
             unit) ]]
 
-        Print(PrintType.Info, "2. Unable to find spec info for", (nameAndRealm or "n/a"), unit)
+        table.insert(typeTwoMissing, { ((nameAndRealm or "n/a") .. "[" .. unit .. "]") })
+        --Print(PrintType.Info, "2. Unable to find spec info for", (nameAndRealm or "n/a"), unit)
         return {
             name = name or nameAndRealm,
             realm = realm,
