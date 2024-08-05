@@ -638,7 +638,7 @@ getPlayerInfo = function(unit)
     else
         if not raidIndex then
             local name, realm = UnitName(unit)
-            table.insert(typeOneMissing, { ((name or "n/a") .. "-" .. (realm or "n/a") .. "[" .. unit .. "]") })
+            table.insert(typeOneMissing, ((name or "n/a") .. "-" .. (realm or "n/a") .. "[" .. unit .. "]"))
             --Print(PrintType.Info, "1. Unable to find spec info for", (name or "n/a") .. "-" .. (realm or "n/a"), unit)
             return {
                 name = name,
@@ -657,7 +657,7 @@ getPlayerInfo = function(unit)
         --[[ DevAdd({ name, realm, rank, subGroup, level, class, fileName, zone, online, isDead, role, isML, combatRole },
             unit) ]]
 
-        table.insert(typeTwoMissing, { ((nameAndRealm or "n/a") .. "[" .. unit .. "]") })
+        table.insert(typeTwoMissing, ((nameAndRealm or "n/a") .. "[" .. unit .. "]"))
         --Print(PrintType.Info, "2. Unable to find spec info for", (nameAndRealm or "n/a"), unit)
         return {
             name = name or nameAndRealm,
