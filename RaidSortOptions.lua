@@ -621,6 +621,7 @@ getPlayerInfo = function(unit)
     ---@type CachedPlayerInfo
     ---@diagnostic disable-next-line: undefined-field
     local cachedInfo = LGI:GetCachedInfo(guid)
+    --DevTool:AddData(cachedInfo or {}, unit .. (isValidPlayerInfo(cachedInfo) and " valid" or " invalid"))
     if isValidPlayerInfo(cachedInfo) then
         --[[ DevAdd(cachedInfo, unit) ]]
         local subGroup = raidIndex and select(3, GetRaidRosterInfo(raidIndex)) or 1
@@ -730,8 +731,13 @@ end
 ---@param info CachedPlayerInfo
 ---@return boolean
 isValidPlayerInfo = function(info)
-    return (info and info.specId and info.specRole
-        and info.role and info.name and info.realm) == true
+    if not info then return false end
+    if not info.specId then return false end
+    if not info.specRole then return false end
+    if not info.role then return false end
+    if not info.name then return false end
+    if not info.realm then return false end
+    return true
 end
 
 -- MARK: Events
