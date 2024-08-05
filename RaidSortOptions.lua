@@ -330,10 +330,7 @@ end
 ---@param SORTED_RAID_GROUPS table<number, table<Player>>
 updateRaidFrames = function(SORTED_RAID_GROUPS)
     -- We have to be 100% certain we won't be tainting
-    if InCombatLockdown() then
-        updateIsQued = true
-        return
-    end
+    if not shouldSort() then return end
     Print(PrintType.Debug, "updateRaidFrames - combined:", Cell.vars.currentLayoutTable["main"]["combineGroups"])
 
     for subgroup, players in pairs(SORTED_RAID_GROUPS) do
@@ -372,6 +369,8 @@ updateRaidFrames = function(SORTED_RAID_GROUPS)
             header:SetAttribute("nameList", F:TableToString(nameList, ","))
         end
     end
+
+    canelQueuedUpdate(true)
 end
 
 -- MARK: Sorting functions
@@ -692,7 +691,6 @@ end
 handleQueuedUpdate = function()
     if not updateIsQued or not shouldSort() then return end
 
-    updateIsQued = false
     sortRaidFrames()
 end
 
