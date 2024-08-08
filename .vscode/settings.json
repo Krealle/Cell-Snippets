@@ -81,6 +81,14 @@
     "Cell",
     "CellDB",
     "CellPartyFrameHeader",
-    "CellLoadingBar"
+    "CellLoadingBar",
+    "C_PlayerInfo",
+    "GetSpecialization",
+    "GetUnitName",
+    "UnitGroupRolesAssigned",
+    "tinsert",
+    "InCombatLockdown",
+    "C_Timer",
+    "CreateFrame"
   ],
 }
