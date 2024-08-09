@@ -123,6 +123,9 @@ local SPEC_PRIORITY = {
 -- but will not show new group members until combat ends.
 local USE_NAME_FILTER = false
 
+-- Only sort when inside a raid instance (eg. not outdoors)
+local ONLY_SORT_IN_RAID = false
+
 ---------------------------------------------------------------------------
 -- WIP: The ones below don't actually do anything yet
 
@@ -284,6 +287,10 @@ sanitizeSortOptions = function()
     if type(USE_NAME_FILTER) ~= "boolean" then
         Print(PrintType.Info, "Invalid USE_NAME_FILTER - forced to false")
         USE_NAME_FILTER = false
+    end
+    if type(ONLY_SORT_IN_RAID) ~= "boolean" then
+        Print(PrintType.Info, "Invalid ONLY_SORT_IN_RAID - forced to false")
+        ONLY_SORT_IN_RAID = false
     end
 
     --[[ DevAdd({ INTERNAL_SORT_OPTIONS,
@@ -686,6 +693,10 @@ shouldSort = function()
     end
     if InCombatLockdown() then
         cancelQueuedUpdate()
+        return false
+    end
+    if ONLY_SORT_IN_RAID and not (select(2, IsInInstance()) == "raid") then
+        cancelQueuedUpdate(true)
         return false
     end
 
