@@ -126,6 +126,11 @@ local USE_NAME_FILTER = false
 -- Only sort when inside a raid instance (eg. not outdoors)
 local ONLY_SORT_IN_RAID = false
 
+-- Where to place the player
+-- Valid range: 1-40 (5 if not using combineGroups)
+local FIXED_PLAYER_INDEX = 1
+local USE_FIXED_PLAYER_INDEX = false
+
 ---------------------------------------------------------------------------
 -- WIP: The ones below don't actually do anything yet
 
@@ -135,12 +140,6 @@ local ONLY_SORT_IN_RAID = false
 -- "CLASS"
 -- local rolePriority = {"TANK", "HEALER", "DAMAGER"}
 -- local classPriority = {"DEATHKNIGHT", "DEMONHUNTER", "DRUID", "HUNTER", "MAGE", "MONK", "PALADIN", "PRIEST", "ROGUE", "SHAMAN", "WARLOCK", "WARRIOR"}
-
--- Where to place the player
--- Ideally use sortingPriority over this unless you need a very specific position
--- Valid range: 1-5
--- local fixedPlayerIndex = 1
--- local useFixedPlayedIndex = false
 
 -- Toggle whether to sort only your group
 -- local onlySortMyGroup = true
@@ -292,6 +291,19 @@ sanitizeSortOptions = function()
         Print(PrintType.Info, "Invalid ONLY_SORT_IN_RAID - forced to false")
         ONLY_SORT_IN_RAID = false
     end
+    if type(FIXED_PLAYER_INDEX) ~= "number" or FIXED_PLAYER_INDEX < 1 or FIXED_PLAYER_INDEX > 40 then
+        Print(PrintType.Info, "Invalid FIXED_PLAYER_INDEX - forced to 1")
+        FIXED_PLAYER_INDEX = 1
+    end
+    if (not Cell.vars.currentLayoutTable["main"]["combineGroups"]) and FIXED_PLAYER_INDEX > 5 then
+        Print(PrintType.Info,
+            "Invalid FIXED_PLAYER_INDEX, Combine Groups is disabled and index is greater than 5 - forced to 1")
+        FIXED_PLAYER_INDEX = 1
+    end
+    if type(USE_FIXED_PLAYER_INDEX) ~= "boolean" then
+        Print(PrintType.Info, "Invalid USE_FIXED_PLAYER_INDEX - forced to false")
+        USE_FIXED_PLAYER_INDEX = false
+    end
 
     --[[ DevAdd({ INTERNAL_SORT_OPTIONS,
             INTERNAL_SPEC_PRIORITY,
@@ -341,19 +353,34 @@ updateRaidFrames = function(SORTED_RAID_GROUPS)
         addUpdateToQueue()
         return
     end
-    Print(PrintType.Debug, "updateRaidFrames - combined:", Cell.vars.currentLayoutTable["main"]["combineGroups"])
+    --Print(PrintType.Debug, "updateRaidFrames - combined:", Cell.vars.currentLayoutTable["main"]["combineGroups"])
 
+    local shouldFindFixedPlayerIndex = USE_FIXED_PLAYER_INDEX
     for subgroup, players in pairs(SORTED_RAID_GROUPS) do
         -- get the proper header here
         local header = _G["CellRaidFrameHeader" .. subgroup]
 
         local nameList = {}
         if USE_NAME_FILTER and header:GetAttribute("sortMethod") ~= "NAMELIST" then
-            Print(PrintType.Debug, "updateRaidFrames - setting sortMethod to NAMELIST")
+            --Print(PrintType.Debug, "updateRaidFrames - setting sortMethod to NAMELIST")
             header:SetAttribute("groupingOrder", "")
             header:SetAttribute("groupBy", nil)
             header:SetAttribute("groupFilter", nil)
             header:SetAttribute("sortMethod", "NAMELIST")
+        end
+
+        if shouldFindFixedPlayerIndex then
+            for idx, player in ipairs(players) do
+                if playerName == player.name then
+                    local playerEntry = table.remove(players, idx)
+
+                    local pos = math.min(FIXED_PLAYER_INDEX, (#players + 1))
+                    table.insert(players, pos, playerEntry)
+
+                    shouldFindFixedPlayerIndex = false
+                    break
+                end
+            end
         end
 
         -- iterate over the players in the subgroup
@@ -374,6 +401,8 @@ updateRaidFrames = function(SORTED_RAID_GROUPS)
             -- Update OmniCD namespace
             _G[b:GetName()].unit = player.unit
         end
+
+
 
         if USE_NAME_FILTER then
             header:SetAttribute("nameList", F:TableToString(nameList, ","))
@@ -534,7 +563,7 @@ getSortedRaidGroup = function(UNSORTED_RAID_GROUPS)
     if not UNSORTED_RAID_GROUPS then return end
 
     for sub, players in pairs(UNSORTED_RAID_GROUPS) do
-        Print(PrintType.Debug, "sub: ", sub, #players)
+        --[[ Print(PrintType.Debug, "sub: ", sub, #players) ]]
         if #players > 1 then
             table.sort(players,
                 ---@param playerA Player
@@ -550,16 +579,16 @@ getSortedRaidGroup = function(UNSORTED_RAID_GROUPS)
                     for sortOption, sortFunction in pairs(INTERNAL_SORT_OPTIONS) do
                         local maybeSortResult = sortFunction(playerA, playerB)
                         if maybeSortResult ~= nil then
-                            Print(PrintType.Debug, "sort: ", playerA.name, "(", playerA.unit, ") ", playerB.name, "(",
+                            --[[ Print(PrintType.Debug, "sort: ", playerA.name, "(", playerA.unit, ") ", playerB.name, "(",
                                 playerB.unit,
-                                ") ==>", sortOption)
+                                ") ==>", sortOption) ]]
                             return direction(maybeSortResult)
                         end
                     end
 
-                    Print(PrintType.Debug, "sort: ", playerA.name, "(", playerA.unit, ") ", playerB.name, "(",
+                    --[[ Print(PrintType.Debug, "sort: ", playerA.name, "(", playerA.unit, ") ", playerB.name, "(",
                         playerB.unit,
-                        ") ==> fallback")
+                        ") ==> fallback") ]]
                     return direction(playerA.unit < playerB.unit)
                 end)
         end
@@ -611,7 +640,7 @@ getRaidGroupInfo = function()
         Print(PrintType.Info, "Unable to find spec info(1) for:", F:TableToString(typeOneMissing, ", "))
     end
     if #typeTwoMissing > 0 then
-        Print(PrintType.Info, "Unable to find spec info(1) for:", F:TableToString(typeTwoMissing, ", "))
+        Print(PrintType.Info, "Unable to find spec info(2) for:", F:TableToString(typeTwoMissing, ", "))
     end
 
     --DevAdd(UNSORTED_RAID_GROUPS, "UNSORTED_RAID_GROUPS")
