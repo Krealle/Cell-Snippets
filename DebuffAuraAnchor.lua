@@ -14,7 +14,7 @@ local function isDebuff(type, filter)
     return (type and type == "spell" and filter and filter == "HARMFUL")
 end
 
-function F:ShowTooltips(anchor, tooltipType, unit, aura, filter)
+function F.ShowTooltips(anchor, tooltipType, unit, aura, filter)
     if not CellDB["general"]["enableTooltips"] or (tooltipType == "unit" and CellDB["general"]["hideTooltipsInCombat"] and InCombatLockdown()) then return end
 
     if isDebuff(tooltipType, filter) and hasDebuffIndicator(anchor, aura) then

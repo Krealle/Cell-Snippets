@@ -13,10 +13,10 @@
 ---------------------------------------------------------------------------
 ---@type table<number, IndicatorTalentOption>
 local IndicatorTalentOptions = {
-    -- Example, Only show Prescience indicator when: 
+    -- Example, Only show Prescience indicator when:
     -- 1. The talent Prescience is active
     -- 2. Playing Augmentation
-    -- 3. Using the the default layout 
+    -- 3. Using the the default layout
     { talentID = 409311, spec = "Augmentation", indicator = "Prescience", enabled = true, layout = "default" },
 }
 ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ updateCurrentLayoutOptions = function()
 
     local curSpecID, curSpecName = GetSpecializationInfo(GetSpecialization())
 
-    for idx, opt  in pairs(IndicatorTalentOptions) do
+    for idx, opt in pairs(IndicatorTalentOptions) do
         local option = maybeOption(opt, curSpecID, curSpecName, idx)
 
         if option then
@@ -110,9 +110,10 @@ updateCurrentLayoutOptions = function()
 end
 
 updateIndicators = function()
-    Print("updateIndicators - " .. "layout:" .. curLayout .. " valid:" .. (ValidTalentOptions[curLayout] and #ValidTalentOptions[curLayout] or 0))
+    Print("updateIndicators - " ..
+    "layout:" .. curLayout .. " valid:" .. (ValidTalentOptions[curLayout] and #ValidTalentOptions[curLayout] or 0))
     if not ValidTalentOptions[curLayout] then return end
-    
+
     for _, opt in pairs(ValidTalentOptions[curLayout]) do
         local state
         if IsPlayerSpell(opt.talentID) then
@@ -121,7 +122,7 @@ updateIndicators = function()
             state = not opt.enabled
         end
 
-        Cell:Fire("UpdateIndicators", curLayout, opt.indicatorName, "enabled", state)
+        Cell.Fire("UpdateIndicators", curLayout, opt.indicatorName, "enabled", state)
     end
 end
 
@@ -131,16 +132,16 @@ eventFrame:SetScript("OnEvent", function(self, event)
     if event == "PLAYER_ENTERING_WORLD" then
         updateCurrentLayoutOptions()
         -- Init callbacks event listeners
-        if not init then 
+        if not init then
             init = true
-            
-            Cell:RegisterCallback("UpdateLayout", "IndicatorTalentOption_UpdateLayout", function() 
+
+            Cell.RegisterCallback("UpdateLayout", "IndicatorTalentOption_UpdateLayout", function()
                 layoutChanged = true
                 updateCurrentLayoutOptions()
             end)
-            
+
             -- Talent update
-            eventFrame:RegisterEvent("TRAIT_CONFIG_UPDATED") 
+            eventFrame:RegisterEvent("TRAIT_CONFIG_UPDATED")
             -- Easy way to revert current changes
             eventFrame:RegisterEvent("ACTIVE_PLAYER_SPECIALIZATION_CHANGED")
         end
@@ -150,18 +151,21 @@ eventFrame:SetScript("OnEvent", function(self, event)
 end)
 
 -- Use this to properly delay updates on various changes to layout
-CellLoadingBar:HookScript("OnHide", function() 
-    if layoutChanged then 
+CellLoadingBar:HookScript("OnHide", function()
+    if layoutChanged then
         layoutChanged = false
-        updateIndicators() 
+        updateIndicators()
     end
 end)
 Cell.frames.optionsFrame:HookScript("OnHide", updateIndicators)
 
 -- Debug
-Print = function(msg, isErr) 
-    if isErr then F:Print("IndicatorTalentOption: |cFFFF3030" .. msg .. "|r")
-    elseif debug then F:Print("IndicatorTalentOption: " .. msg) end
+Print = function(msg, isErr)
+    if isErr then
+        F.Print("IndicatorTalentOption: |cFFFF3030" .. msg .. "|r")
+    elseif debug then
+        F.Print("IndicatorTalentOption: " .. msg)
+    end
 end
 DevAdd = function(data, name) if debug and DevTool then DevTool:AddData(data, name) end end
 

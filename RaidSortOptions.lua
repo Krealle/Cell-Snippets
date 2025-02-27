@@ -405,7 +405,7 @@ updateRaidFrames = function(SORTED_RAID_GROUPS)
 
 
         if USE_NAME_FILTER then
-            header:SetAttribute("nameList", F:TableToString(nameList, ","))
+            header:SetAttribute("nameList", F.TableToString(nameList, ","))
         end
     end
 
@@ -621,7 +621,7 @@ getRaidGroupInfo = function()
             end
         end
     else
-        playerSubGroup = select(2, F:GetRaidInfoByName(playerName))
+        playerSubGroup = select(2, F.GetRaidInfoByName(playerName))
 
         for i = 1, GetNumGroupMembers() do
             local player = getPlayerInfo("raid" .. i)
@@ -637,10 +637,10 @@ getRaidGroupInfo = function()
     end
 
     if #typeOneMissing > 0 then
-        Print(PrintType.Info, "Unable to find spec info(1) for:", F:TableToString(typeOneMissing, ", "))
+        Print(PrintType.Info, "Unable to find spec info(1) for:", F.TableToString(typeOneMissing, ", "))
     end
     if #typeTwoMissing > 0 then
-        Print(PrintType.Info, "Unable to find spec info(2) for:", F:TableToString(typeTwoMissing, ", "))
+        Print(PrintType.Info, "Unable to find spec info(2) for:", F.TableToString(typeTwoMissing, ", "))
     end
 
     --DevAdd(UNSORTED_RAID_GROUPS, "UNSORTED_RAID_GROUPS")
@@ -798,7 +798,7 @@ end)
 RaidFrame_UpdateLayout = function()
     addUpdateToQueue()
 end
-Cell:RegisterCallback("UpdateLayout", "RaidSortOptions_UpdateLayout", RaidFrame_UpdateLayout)
+Cell.RegisterCallback("UpdateLayout", "RaidSortOptions_UpdateLayout", RaidFrame_UpdateLayout)
 
 -- MARK: Debug
 -------------------------------------------------------
